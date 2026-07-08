@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Rambaugchi Matarani 2026 - Rambaugchi Matarani Vargani Building Society Management Portal. Login to manage flats, payments, and receipts.">
+  <title>Rambaugchi Matarani 2026 | Rambaugchi Matarani Vargani</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('img[src^="/static/images/logo.png"]').forEach(img => {
+        img.src = '/static/images/logo.png?t=' + new Date().getTime();
+      });
+    });
+  </script>
+</head>
+<body>
+  <!-- Background Animation -->
+  <div class="bg-animation">
+    <div class="orb"></div>
+    <div class="orb"></div>
+    <div class="orb"></div>
+  </div>
+
+  <div class="login-page">
+    <div class="login-container">
+      <!-- Header -->
+      <div class="login-header">
+        <img src="/static/images/logo.png" alt="Rambaugchi Matarani Logo" style="width: 100px; height: 100px; object-fit: contain; margin-bottom: 5px; animation: scaleIn 0.5s ease;">
+        <h1 style="display:none;">RAMBAUGCHI MATARANI</h1>
+        <p class="subtitle">Rambaugchi Matarani Vargani</p>
+        <span class="year-badge">2026</span>
+      </div>
+
+      <!-- Login Card -->
+      <div class="login-card">
+        <!-- Auth Tabs -->
+        <div class="role-tabs">
+          <button class="role-tab active" id="tabQuickCheck">🏠 Quick</button>
+          <button class="role-tab" id="tabSignIn">🔑 Login</button>
+          <button class="role-tab" id="tabSignUp">📝 Signup</button>
+          <button class="role-tab" id="tabJourney">📅 Journey</button>
+        </div>
+
+        <!-- Quick Check Form -->
+        <form id="quickCheckForm" autocomplete="off">
+          <div class="form-group">
+            <label for="quickFlatNo">Select Flat Number</label>
+            <select id="quickFlatNo" required style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-primary); font-size:1rem; margin-top:5px;">
+              <option value="">Select your flat...</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" id="quickCheckBtn" style="margin-top:20px;">
+            Check Status →
+          </button>
+          <div class="error-msg" id="quickCheckError">Invalid flat number</div>
+          
+          <div id="quickCheckResult" style="display:none; margin-top:20px; padding:20px; border-radius:12px; border:1px solid var(--border-color); background:var(--bg-secondary); text-align:center; animation: slideUp 0.3s ease;">
+            <!-- Rendered by JS -->
+          </div>
+        </form>
+
+        <!-- Sign In Form -->
+        <form id="signInForm" style="display:none;" autocomplete="off">
+          <div class="form-group">
+            <label for="signInEmail">Email</label>
+            <input type="email" id="signInEmail" placeholder="Enter your email" required>
+          </div>
+          <div class="form-group">
+            <label for="signInPassword">Password</label>
+            <input type="password" id="signInPassword" placeholder="Enter your password" required>
+            <div style="text-align: right; margin-top: 5px;">
+              <a href="#" id="showForgotPassword" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none; font-weight: 500;">Forgot Password?</a>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="signInBtn">
+            Sign In →
+          </button>
+          <div class="error-msg" id="signInError">Invalid email or password</div>
+        </form>
+
+        <!-- Forgot Password Form -->
+        <form id="forgotPasswordForm" style="display:none;" autocomplete="off">
+          <div class="form-group">
+            <label for="forgotEmail">Email</label>
+            <input type="email" id="forgotEmail" placeholder="Enter your registered email" required>
+          </div>
+          <div class="form-group">
+            <label for="forgotFlat">Flat Number</label>
+            <select id="forgotFlat" style="width:100%; padding:14px 16px; border-radius:var(--radius-md); border:1px solid var(--border-glass); background:rgba(255, 255, 255, 0.95); color:var(--text-primary); font-size:0.95rem; font-family:'Inter', sans-serif;" required>
+              <option value="">Select your flat number</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="forgotNewPassword">New Password</label>
+            <input type="password" id="forgotNewPassword" placeholder="Enter new password (min 4 chars)" required minlength="4">
+          </div>
+          <button type="submit" class="btn btn-primary" id="forgotPasswordBtn">
+            Reset Password
+          </button>
+          <div style="text-align: center; margin-top: 15px;">
+            <a href="#" id="backToSignIn" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">← Back to Login</a>
+          </div>
+          <div class="error-msg" id="forgotError">Failed to reset password</div>
+          <div class="success-msg" id="forgotSuccess" style="display:none; color:var(--success); font-size:0.85rem; margin-top:12px; text-align:center; animation: slideUp 0.3s ease;">✅ Password reset successful! Please sign in.</div>
+        </form>
+
+        <!-- Sign Up Form -->
+        <form id="signUpForm" style="display:none;" autocomplete="off">
+          <div class="form-group">
+            <label for="signUpName">Full Name</label>
+            <input type="text" id="signUpName" placeholder="Enter your full name" required>
+          </div>
+          <div class="form-group">
+            <label for="signUpEmail">Email</label>
+            <input type="email" id="signUpEmail" placeholder="Enter your email" required>
+          </div>
+          <div class="form-group">
+            <label for="signUpPassword">Password</label>
+            <input type="password" id="signUpPassword" placeholder="Create a password (min 4 chars)" required minlength="4">
+          </div>
+          <div class="form-group">
+            <label for="signUpConfirm">Confirm Password</label>
+            <input type="password" id="signUpConfirm" placeholder="Confirm your password" required minlength="4">
+          </div>
+          <div class="form-group">
+            <label for="signUpFlat">Flat Number (optional)</label>
+            <select id="signUpFlat" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-primary); font-size:1rem; margin-top:5px;">
+              <option value="">Select your flat number</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" id="signUpBtn" style="margin-top:20px;">
+            Create Account →
+          </button>
+          <div class="error-msg" id="signUpError">Registration failed</div>
+          <div class="success-msg" id="signUpSuccess" style="display:none; color:var(--success); font-size:0.85rem; margin-top:12px; animation: slideUp 0.3s ease;">✅ Account created! Please sign in.</div>
+        </form>
+
+        <!-- Journey Section -->
+        <div id="journeySection" style="display:none; padding:10px 0;">
+          <h2 style="font-family:'Outfit',sans-serif; text-align:center; color:var(--text-primary); margin-bottom:20px;">📅 Journey 2010-2025</h2>
+          <div id="publicJourneyContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px;">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top:24px; font-size:0.8rem; color:var(--text-muted);">
+        © 2026 Rambaugchi Matarani • Rambaugchi Matarani Vargani<br>
+        <span style="font-size:0.75rem; opacity:0.7; display:inline-block; margin-top:8px;"><strong>Tech Stack:</strong> Frontend (HTML5, CSS, JS) | Backend (Python Flask &amp; SQLite DB)</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Journey Image Modal -->
+  <div class="modal-overlay" id="journeyDetailModal">
+    <div class="modal" style="max-width: 900px; width: 95%; background: transparent; border: none; box-shadow: none; padding: 0;">
+      <div style="display: flex; justify-content: flex-end; padding-bottom: 10px;">
+        <button class="modal-close" id="journeyDetailClose" style="background: var(--bg-primary); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; opacity: 1;">✕</button>
+      </div>
+      <div id="journeyDetailContent" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check session from backend
+      try {
+        const res = await fetch('/api/session');
+        const sessionData = await res.json();
+        if (sessionData.loggedIn) {
+          if (sessionData.role === 'admin') {
+            window.location.href = '/admin';
+          } else {
+            window.location.href = '/user';
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      }
+
+      const tabQuickCheck = document.getElementById('tabQuickCheck');
+      const tabSignIn = document.getElementById('tabSignIn');
+      const tabSignUp = document.getElementById('tabSignUp');
+      const tabJourney = document.getElementById('tabJourney');
+      
+      const quickCheckForm = document.getElementById('quickCheckForm');
+      const signInForm = document.getElementById('signInForm');
+      const signUpForm = document.getElementById('signUpForm');
+      const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+      const journeySection = document.getElementById('journeySection');
+      
+      const quickFlatSelect = document.getElementById('quickFlatNo');
+      const signUpFlatSelect = document.getElementById('signUpFlat');
+      const forgotFlatSelect = document.getElementById('forgotFlat');
+
+      // Populate flat dropdown from backend API
+      try {
+        const flatsRes = await fetch('/api/flats');
+        const flats = await flatsRes.json();
+        flats.forEach(flat => {
+          const option = document.createElement('option');
+          option.value = flat.flatNo;
+          option.textContent = `Flat ${flat.flatNo} - ${flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`}${flat.ownerName ? ' (' + flat.ownerName + ')' : ''}`;
+          quickFlatSelect.appendChild(option);
+          signUpFlatSelect.appendChild(option.cloneNode(true));
+          if (forgotFlatSelect) forgotFlatSelect.appendChild(option.cloneNode(true));
+        });
+      } catch (err) {
+        console.error('Failed to load flats:', err);
+      }
+
+      // Load Journey Data
+      window.publicJourneyData = [];
+      async function loadPublicJourney() {
+        try {
+          const res = await fetch('/api/journey');
+          if (!res.ok) return;
+          window.publicJourneyData = await res.json();
+          const container = document.getElementById('publicJourneyContainer');
+          let html = '';
+          for (let year = 2010; year <= 2025; year++) {
+            const yearData = window.publicJourneyData.find(j => j.year === year);
+            const hasImage = yearData && yearData.imageBase64;
+            
+            html += `
+              <div class="journey-card" style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; padding:15px; text-align:center; display:flex; flex-direction:column; gap:8px; ${hasImage ? 'cursor:pointer;' : ''}" ${hasImage ? `onclick="openJourneyModal(${year})"` : ''}>
+                <div style="font-size:2rem; font-weight:800; font-family:'Outfit', sans-serif; color:var(--accent-primary);">${year}</div>
+                <div class="journey-image-container" style="height:120px; background:var(--bg-primary); border-radius:8px; display:flex; align-items:center; justify-content:center; border:2px dashed var(--border-color);">
+                  ${hasImage ? `<img src="${yearData.imageBase64}" style="width:100%; height:100%; object-fit:cover; border-radius: 4px;">` : `<span style="font-size:1.2rem; color:var(--text-muted); font-family: 'Outfit', sans-serif;">Coming Soon</span>`}
+                </div>
+              </div>
+            `;
+          }
+          container.innerHTML = html;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      loadPublicJourney();
+
+      window.openJourneyModal = function(year) {
+        const data = window.publicJourneyData.find(j => j.year === year);
+        if (!data || !data.imageBase64) return;
+        
+        const content = document.getElementById('journeyDetailContent');
+        content.innerHTML = `
+          <h3 style="font-size: 2.5rem; color: var(--accent-primary); margin-bottom: 20px; font-family: 'Outfit', sans-serif;">${year}</h3>
+          <img src="${data.imageBase64}" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        `;
+        document.getElementById('journeyDetailModal').classList.add('show');
+      };
+
+      // Modal close logic
+      const closeBtn = document.getElementById('journeyDetailClose');
+      const modal = document.getElementById('journeyDetailModal');
+      if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.remove('show'));
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) modal.classList.remove('show');
+        });
+      }
+
+      // Tab switching
+      function switchTab(activeTab, activeForm) {
+        [tabQuickCheck, tabSignIn, tabSignUp, tabJourney].forEach(t => t.classList.remove('active'));
+        [quickCheckForm, signInForm, signUpForm, forgotPasswordForm, journeySection].forEach(f => {
+          if (f) f.style.display = 'none';
+        });
+        
+        activeTab.classList.add('active');
+        activeForm.style.display = 'block';
+        activeForm.style.animation = 'slideUp 0.3s ease';
+      }
+
+      tabQuickCheck.addEventListener('click', () => switchTab(tabQuickCheck, quickCheckForm));
+      tabSignIn.addEventListener('click', () => switchTab(tabSignIn, signInForm));
+      tabSignUp.addEventListener('click', () => switchTab(tabSignUp, signUpForm));
+      tabJourney.addEventListener('click', () => switchTab(tabJourney, journeySection));
+
+      // Quick Check
+      quickCheckForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const flatNo = quickFlatSelect.value;
+        const resultContainer = document.getElementById('quickCheckResult');
+        resultContainer.style.display = 'none';
+
+        try {
+          const response = await fetch('/api/quick-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ flatNo })
+          });
+          const result = await response.json();
+          if (result.success) {
+            resultContainer.style.display = 'block';
+            if (result.isPaid) {
+              resultContainer.innerHTML = `
+                <div style="font-size:3rem; margin-bottom:10px;">✅</div>
+                <div style="font-size:1.5rem; font-weight:700; color:var(--success);">PAID</div>
+                <div style="color:var(--text-secondary); margin-top:5px;">Amount: ₹${result.amount || 0}</div>
+              `;
+            } else {
+              resultContainer.innerHTML = `
+                <div style="font-size:3rem; margin-bottom:10px;">❌</div>
+                <div style="font-size:1.5rem; font-weight:700; color:var(--danger);">UNPAID</div>
+              `;
+            }
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          const errEl = document.getElementById('quickCheckError');
+          errEl.textContent = err.message || 'Failed to check status';
+          errEl.classList.add('show');
+          setTimeout(() => errEl.classList.remove('show'), 3000);
+        }
+      });
+
+      // Sign In
+      signInForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('signInEmail').value.trim();
+        const password = document.getElementById('signInPassword').value;
+
+        try {
+          const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const result = await response.json();
+          if (result.success) {
+            if (result.role === 'admin') {
+              window.location.href = '/admin';
+            } else {
+              window.location.href = '/user';
+            }
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          const errEl = document.getElementById('signInError');
+          errEl.textContent = err.message || 'Invalid email or password';
+          errEl.classList.add('show');
+          setTimeout(() => errEl.classList.remove('show'), 3000);
+        }
+      });
+
+      // Forgot Password Toggle
+      const showForgotPassword = document.getElementById('showForgotPassword');
+      const backToSignIn = document.getElementById('backToSignIn');
+
+      if (showForgotPassword) {
+        showForgotPassword.addEventListener('click', (e) => {
+          e.preventDefault();
+          signInForm.style.display = 'none';
+          forgotPasswordForm.style.display = 'block';
+          forgotPasswordForm.style.animation = 'slideUp 0.3s ease';
+        });
+      }
+
+      if (backToSignIn) {
+        backToSignIn.addEventListener('click', (e) => {
+          e.preventDefault();
+          forgotPasswordForm.style.display = 'none';
+          signInForm.style.display = 'block';
+          signInForm.style.animation = 'slideUp 0.3s ease';
+        });
+      }
+
+      // Forgot Password Submit
+      forgotPasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('forgotEmail').value.trim();
+        const flatNo = document.getElementById('forgotFlat').value;
+        const newPassword = document.getElementById('forgotNewPassword').value;
+
+        try {
+          const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, flatNo, newPassword })
+          });
+          const result = await response.json();
+          if (result.success) {
+            const successEl = document.getElementById('forgotSuccess');
+            successEl.style.display = 'block';
+            forgotPasswordForm.reset();
+            setTimeout(() => {
+              successEl.style.display = 'none';
+              backToSignIn.click();
+            }, 3000);
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          const errEl = document.getElementById('forgotError');
+          errEl.textContent = err.message || 'Failed to reset password';
+          errEl.classList.add('show');
+          setTimeout(() => errEl.classList.remove('show'), 3000);
+        }
+      });
+
+      // Sign Up
+      signUpForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('signUpName').value.trim();
+        const email = document.getElementById('signUpEmail').value.trim();
+        const password = document.getElementById('signUpPassword').value;
+        const confirm = document.getElementById('signUpConfirm').value;
+        const flatNo = document.getElementById('signUpFlat').value;
+
+        if (password !== confirm) {
+          const errEl = document.getElementById('signUpError');
+          errEl.textContent = 'Passwords do not match';
+          errEl.classList.add('show');
+          setTimeout(() => errEl.classList.remove('show'), 3000);
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password, flatNo })
+          });
+          const result = await response.json();
+          if (result.success) {
+            const successEl = document.getElementById('signUpSuccess');
+            successEl.style.display = 'block';
+            signUpForm.reset();
+            setTimeout(() => {
+              successEl.style.display = 'none';
+              tabSignIn.click();
+            }, 2000);
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          const errEl = document.getElementById('signUpError');
+          errEl.textContent = err.message || 'Registration failed';
+          errEl.classList.add('show');
+          setTimeout(() => errEl.classList.remove('show'), 3000);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+

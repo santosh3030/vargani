@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Resident Dashboard - Rambaugchi Matarani 2026 Rambaugchi Matarani Vargani. View your flat details and download payment receipts.">
+  <title>My Flat | Rambaugchi Matarani 2026</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- jsPDF Library for PDF Generation -->
+  <script src="/static/js/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <!-- Background Animation -->
+  <div class="bg-animation">
+    <div class="orb"></div>
+    <div class="orb"></div>
+    <div class="orb"></div>
+  </div>
+
+  <!-- Mobile Toggle -->
+  <button class="mobile-toggle" id="mobileToggle">☰</button>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+           <img src="/static/images/logo.png" alt="Logo" style="width: 40px; height: 40px; object-fit: contain;">
+           <h2 style="margin:0; font-size: 1.2rem;">RAMBAUGCHI MATARANI</h2>
+        </div>
+        <span class="role-badge user">Resident</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="myFlatSection">
+          <span class="nav-icon">🏠</span> My Flat
+        </button>
+        <button class="nav-item" data-section="overviewSection">
+          <span class="nav-icon">🏗️</span> Building Overview
+        </button>
+        <button class="nav-item" data-section="karykartaSection">
+          <span class="nav-icon">👔</span> Karykartas
+        </button>
+        <button class="nav-item" data-section="bhandaraSection">
+          <span class="nav-icon">🌾</span> Bhandara
+        </button>
+        <button class="nav-item" data-section="journeySection">
+          <span class="nav-icon">📅</span> Journey 2010-25
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="nav-item" id="logoutBtn" style="color:var(--danger);">
+          <span class="nav-icon">🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- My Flat Section -->
+      <div class="content-section" id="myFlatSection">
+        <div class="top-bar">
+          <h1>🏠 My Flat Details</h1>
+        </div>
+        <div id="flatDetails">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Building Overview Section -->
+      <div class="content-section" id="overviewSection" style="display:none;">
+        <div class="top-bar">
+          <h1>🏗️ Building Overview</h1>
+        </div>
+        <div class="building-section">
+          <div class="section-header">
+            <h2>All Floors</h2>
+          </div>
+          <div id="buildingOverview">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Karykarta Section -->
+      <div class="content-section" id="karykartaSection" style="display:none;">
+        <div class="top-bar">
+          <h1>👔 Karykartas</h1>
+        </div>
+        <div class="karykarta-grid" id="karykartaContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 7fr)); gap: 20px; margin-top: 20px;">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Bhandara Section -->
+      <div class="content-section" id="bhandaraSection" style="display:none;">
+        <div class="top-bar">
+          <h1>🌾 Bhandara Donation</h1>
+        </div>
+        <div class="flat-detail-card" style="margin-top:20px;">
+          <h2 style="font-family:'Outfit',sans-serif; font-size:1.3rem; margin-bottom: 10px;">What would you like to donate?</h2>
+          <p style="color:var(--text-secondary); margin-bottom: 20px; font-size: 0.95rem;">
+            Please list any items (like Rice, Dal, Oil, etc.) or amount you wish to contribute towards the community Bhandara.
+          </p>
+          <div class="form-group">
+            <textarea id="bhandaraItemsInput" placeholder="e.g. 5kg Rice and 2L Oil" rows="4" style="width:100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-family: inherit; font-size: 1rem; resize: vertical;"></textarea>
+          </div>
+          <button class="btn btn-primary" id="saveBhandaraBtn" style="margin-top: 15px;">
+            Save Donation
+          </button>
+        </div>
+      </div>
+
+      <!-- Journey Section -->
+      <div class="content-section" id="journeySection" style="display:none;">
+        <div class="top-bar">
+          <h1>📅 Journey 2010-2025</h1>
+        </div>
+        <div id="userJourneyContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 30px; margin-top: 20px;">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <footer style="margin-top: 40px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+        <strong>Tech Stack:</strong> Frontend (HTML5, CSS3, Vanilla JS) | Backend (Python Flask &amp; SQLite DB)
+      </footer>
+    </main>
+  </div>
+
+  <!-- Karykarta Details Modal -->
+  <div class="modal-overlay" id="karykartaDetailModal">
+    <div class="modal" style="max-width: 800px; width: 95%;">
+      <div class="modal-header">
+        <h3>👔 Karykarta Details</h3>
+        <button class="modal-close" id="karykartaDetailClose">✕</button>
+      </div>
+      <div id="karykartaDetailContent" style="padding-top: 10px; display: flex; flex-direction: column; gap: 15px; align-items: center; text-align: center;">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Journey Image Modal -->
+  <div class="modal-overlay" id="journeyDetailModal">
+    <div class="modal" style="max-width: 900px; width: 95%; background: transparent; border: none; box-shadow: none; padding: 0;">
+      <div style="display: flex; justify-content: flex-end; padding-bottom: 10px;">
+        <button class="modal-close" id="journeyDetailClose" style="background: var(--bg-primary); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; opacity: 1;">✕</button>
+      </div>
+      <div id="journeyDetailContent" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/user.js"></script>
+</body>
+</html>
