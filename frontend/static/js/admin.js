@@ -14,6 +14,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   let editingFlat = null;
   let allFlatsCache = []; // Cache to allow fast in-memory searching
 
+  // Mobile sidebar toggle
+  const mobileToggle = document.getElementById('mobileToggle');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  
+  if (mobileToggle) {
+    mobileToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      sidebarOverlay.classList.toggle('show');
+    });
+  }
+
   // ---- DOM Elements ----
   const statsGrid = document.getElementById('statsGrid');
   const buildingContainer = document.getElementById('buildingContainer');

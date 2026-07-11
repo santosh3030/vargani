@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://vargani-1.onrender.com/api/:path*"
+    },
+    {
+      "source": "/admin",
+      "destination": "/templates/admin.html"
+    },
+    {
+      "source": "/user",
+      "destination": "/templates/user.html"
+    },
+    {
+      "source": "/",
+      "destination": "/templates/index.html"
+    }
+  ]
+}
