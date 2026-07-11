@@ -349,9 +349,8 @@
 
             // Attempt to play the video
             loginVideo.play().catch(e => {
-              // If playback fails (e.g., due to autoplay policies), just proceed
-              console.warn("Video playback failed, skipping animation.", e);
-              proceed();
+              console.warn("Video autoplay blocked by browser.", e);
+              // Instead of skipping entirely, we leave the overlay open so they can tap skip
             });
 
             loginVideo.onended = proceed;
@@ -468,7 +467,7 @@
   </script>
   <!-- Video Overlay -->
   <div id="videoOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
-    <video id="loginVideo" style="width: 100%; height: 100%; object-fit: cover;" playsinline>
+    <video id="loginVideo" style="width: 100%; height: 100%; object-fit: cover;" playsinline muted>
       <source src="/static/video/login_animation.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
