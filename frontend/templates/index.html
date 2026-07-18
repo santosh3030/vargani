@@ -213,13 +213,18 @@
       try {
         const flatsRes = await fetch('/api/flats');
         const flats = await flatsRes.json();
+        
+        const createOption = (flat) => {
+          const opt = document.createElement('option');
+          opt.value = flat.flatNo;
+          opt.textContent = `Flat ${flat.flatNo} - ${flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`}${flat.ownerName ? ' (' + flat.ownerName + ')' : ''}`;
+          return opt;
+        };
+
         flats.forEach(flat => {
-          const option = document.createElement('option');
-          option.value = flat.flatNo;
-          option.textContent = `Flat ${flat.flatNo} - ${flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`}${flat.ownerName ? ' (' + flat.ownerName + ')' : ''}`;
-          quickFlatSelect.appendChild(option);
-          signUpFlatSelect.appendChild(option.cloneNode(true));
-          if (forgotFlatSelect) forgotFlatSelect.appendChild(option.cloneNode(true));
+          quickFlatSelect.appendChild(createOption(flat));
+          signUpFlatSelect.appendChild(createOption(flat));
+          if (forgotFlatSelect) forgotFlatSelect.appendChild(createOption(flat));
         });
       } catch (err) {
         console.error('Failed to load flats:', err);
