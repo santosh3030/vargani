@@ -13,6 +13,7 @@
       });
     });
   </script>
+
 </head>
 <body>
   <!-- Background Animation -->
@@ -26,7 +27,7 @@
     <div class="login-container">
       <!-- Header -->
       <div class="login-header">
-        <img src="/static/images/logo.png" alt="Rambaugchi Matarani Logo" style="width: 100px; height: 100px; object-fit: contain; margin-bottom: 5px; animation: scaleIn 0.5s ease;">
+        <img src="/static/images/logo.png" alt="Rambaugchi Matarani Logo" style="width: 180px; height: 180px; object-fit: contain; margin-bottom: 15px; animation: scaleIn 0.5s ease; mix-blend-mode: multiply;">
         <h1 style="display:none;">RAMBAUGCHI MATARANI</h1>
         <p class="subtitle">Rambaugchi Matarani Vargani</p>
         <span class="year-badge">2026</span>
@@ -167,6 +168,16 @@
   <script src="/static/js/app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
+      // Setup mobile video if on mobile
+      const loginVideo = document.getElementById('loginVideo');
+      if (loginVideo) {
+        const source = loginVideo.querySelector('source');
+        if (window.innerWidth <= 768 || window.matchMedia("(orientation: portrait)").matches) {
+          source.src = "/static/video/logo_animation.mp4";
+          loginVideo.load();
+        }
+      }
+
       // Check session from backend
       try {
         const res = await fetch('/api/session');
@@ -324,6 +335,14 @@
       // Sign In
       signInForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        // Warm up video to allow unmuted autoplay after async fetch
+        const loginVideo = document.getElementById('loginVideo');
+        loginVideo.play().then(() => {
+          loginVideo.pause();
+          loginVideo.currentTime = 0;
+        }).catch(e => console.warn("Video warmup failed:", e));
+
         const email = document.getElementById('signInEmail').value.trim();
         const password = document.getElementById('signInPassword').value;
 
@@ -467,8 +486,8 @@
   </script>
   <!-- Video Overlay -->
   <div id="videoOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
-    <video id="loginVideo" style="width: 100%; height: 100%; object-fit: cover;" playsinline muted>
-      <source src="/static/video/login_animation.mp4" type="video/mp4">
+    <video id="loginVideo" style="width: 100%; height: 100%; object-fit: cover;" playsinline>
+      <source src="/static/video/logo_animation.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
     <button id="skipVideoBtn" style="position: absolute; bottom: 40px; right: 40px; padding: 12px 24px; background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255,255,255,0.5); border-radius: 30px; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 1.1rem; backdrop-filter: blur(10px); transition: all 0.3s ease;">Tap to Skip ⏭</button>

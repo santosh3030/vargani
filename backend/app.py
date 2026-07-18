@@ -1,8 +1,10 @@
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import random
 import os
 import hashlib
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask_cors import CORS
 
 base_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(base_dir, '..', 'frontend')
@@ -11,105 +13,118 @@ app = Flask(__name__,
             template_folder=os.path.join(frontend_dir, 'templates'),
             static_folder=os.path.join(frontend_dir, 'static'))
 app.secret_key = 'rambaugchi_matarni_2026_key_secret'
-DB_PATH = os.path.join(os.path.dirname(__file__), 'database.db')
+
+# --- CORS & Session Config ---
+CORS(app, supports_credentials=True)
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
+
+# --- Database Config ---
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/vargani')
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def init_db():
-    conn = get_db_connection()
-    # Create flats table
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS flats (
-            flat_no TEXT PRIMARY KEY,
-            floor INTEGER NOT NULL,
-            owner_name TEXT,
-            is_paid BOOLEAN DEFAULT 0,
-            amount_paid REAL DEFAULT 0.0,
-            payment_date TEXT,
-            receipt_no TEXT,
-            received_by TEXT,
-            bhandara_items TEXT
-        )
-    ''')
-    
-    # Safely try to add new columns to existing DB
     try:
-        conn.execute('ALTER TABLE flats ADD COLUMN received_by TEXT')
-    except sqlite3.OperationalError:
-        pass # Column likely exists
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-    try:
-        conn.execute('ALTER TABLE flats ADD COLUMN bhandara_items TEXT')
-    except sqlite3.OperationalError:
-        pass # Column likely exists
-    # Create users table
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            flat_no TEXT,
-            role TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS karykartas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            position TEXT NOT NULL,
-            flat_no TEXT,
-            photo_base64 TEXT,
-            details TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS journey (
-            year INTEGER PRIMARY KEY,
-            image_base64 TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-
-    # Check if we need to pre-populate flats
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM flats')
-    count = cursor.fetchone()[0]
-    if count == 0:
-        total_floors = 7
-        flats_per_floor = 24
-        flats_to_insert = []
-        for floor in range(0, total_floors + 1):
-            for flat in range(1, flats_per_floor + 1):
-                flat_no = f"{floor}{str(flat).zfill(2)}"
-                flats_to_insert.append((flat_no, floor, '', 0, 0.0, None, None))
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS flats (
+                flat_no TEXT PRIMARY KEY,
+                floor INTEGER NOT NULL,
+                owner_name TEXT,
+                is_paid INTEGER DEFAULT 0,
+                amount_paid REAL DEFAULT 0.0,
+                payment_date TEXT,
+                receipt_no TEXT,
+                received_by TEXT,
+                bhandara_items TEXT
+            )
+        ''')
         
-        conn.executemany('''
-            INSERT INTO flats (flat_no, floor, owner_name, is_paid, amount_paid, payment_date, receipt_no, received_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', [(*f, None) for f in flats_to_insert])
+        try:
+            cursor.execute('ALTER TABLE flats ADD COLUMN received_by TEXT')
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()
+        else:
+            conn.commit()
+            
+        try:
+            cursor.execute('ALTER TABLE flats ADD COLUMN bhandara_items TEXT')
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()
+        else:
+            conn.commit()
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                flat_no TEXT,
+                role TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS karykartas (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                position TEXT NOT NULL,
+                flat_no TEXT,
+                photo_base64 TEXT,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS journey (
+                year INTEGER PRIMARY KEY,
+                image_base64 TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
 
-    # Seed default admin user if not exists
-    admin = conn.execute('SELECT * FROM users WHERE email = ?', ('admin@vargani.com',)).fetchone()
-    if not admin:
-        conn.execute('''
-            INSERT INTO users (name, email, password, role)
-            VALUES (?, ?, ?, ?)
-        ''', ('Admin', 'admin@vargani.com', hash_password('admin123'), 'admin'))
-        conn.commit()
-    conn.close()
+        cursor.execute('SELECT COUNT(*) FROM flats')
+        count = cursor.fetchone()[0]
+        if count == 0:
+            total_floors = 7
+            flats_per_floor = 24
+            flats_to_insert = []
+            for floor in range(0, total_floors + 1):
+                for flat in range(1, flats_per_floor + 1):
+                    flat_no = f"{floor}{str(flat).zfill(2)}"
+                    flats_to_insert.append((flat_no, floor, '', 0, 0.0, None, None, None))
+            
+            cursor.executemany('''
+                INSERT INTO flats (flat_no, floor, owner_name, is_paid, amount_paid, payment_date, receipt_no, received_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ''', flats_to_insert)
+            conn.commit()
+
+        cursor.execute('SELECT * FROM users WHERE email = %s', ('admin@vargani.com',))
+        admin = cursor.fetchone()
+        if not admin:
+            cursor.execute('''
+                INSERT INTO users (name, email, password, role)
+                VALUES (%s, %s, %s, %s)
+            ''', ('Admin', 'admin@vargani.com', hash_password('admin123'), 'admin'))
+            conn.commit()
+        
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Database initialization skipped or failed:", e)
 
 init_db()
 
@@ -141,7 +156,10 @@ def api_login():
         return jsonify({'success': False, 'message': 'Email and password are required'}), 400
     
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+    user = cursor.fetchone()
+    cursor.close()
     conn.close()
     
     if not user or user['password'] != hash_password(password):
@@ -169,7 +187,10 @@ def api_quick_status():
         return jsonify({'success': False, 'message': 'Flat number is required'}), 400
         
     conn = get_db_connection()
-    flat = conn.execute('SELECT * FROM flats WHERE flat_no = ?', (flat_no,)).fetchone()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
+    flat = cursor.fetchone()
+    cursor.close()
     conn.close()
     
     if not flat:
@@ -198,25 +219,29 @@ def api_register():
         return jsonify({'success': False, 'message': 'Password must be at least 4 characters'}), 400
     
     conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # Check if email already exists
-    existing = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+    existing = cursor.fetchone()
     if existing:
+        cursor.close()
         conn.close()
         return jsonify({'success': False, 'message': 'An account with this email already exists'}), 409
     
-    # Verify flat exists if provided
     if flat_no:
-        flat = conn.execute('SELECT * FROM flats WHERE flat_no = ?', (flat_no,)).fetchone()
+        cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
+        flat = cursor.fetchone()
         if not flat:
+            cursor.close()
             conn.close()
             return jsonify({'success': False, 'message': 'Invalid flat number'}), 400
     
-    conn.execute('''
+    cursor.execute('''
         INSERT INTO users (name, email, password, flat_no, role)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     ''', (name, email, hash_password(password), flat_no if flat_no else None, 'user'))
     conn.commit()
+    cursor.close()
     conn.close()
     
     return jsonify({'success': True, 'message': 'Account created successfully! Please sign in.'})
@@ -235,13 +260,17 @@ def api_reset_password():
         return jsonify({'success': False, 'message': 'Password must be at least 4 characters'}), 400
         
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE email = ? AND flat_no = ?', (email, flat_no)).fetchone()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE email = %s AND flat_no = %s', (email, flat_no))
+    user = cursor.fetchone()
     if not user:
+        cursor.close()
         conn.close()
         return jsonify({'success': False, 'message': 'Invalid email or flat number combination'}), 404
         
-    conn.execute('UPDATE users SET password = ? WHERE email = ? AND flat_no = ?', (hash_password(new_password), email, flat_no))
+    cursor.execute('UPDATE users SET password = %s WHERE email = %s AND flat_no = %s', (hash_password(new_password), email, flat_no))
     conn.commit()
+    cursor.close()
     conn.close()
     
     return jsonify({'success': True, 'message': 'Password reset successfully!'})
@@ -303,12 +332,14 @@ def update_user_bhandara():
     items = data.get('items', '').strip()
     
     conn = get_db_connection()
-    conn.execute('''
+    cursor = conn.cursor()
+    cursor.execute('''
         UPDATE flats 
-        SET bhandara_items = ?
-        WHERE flat_no = ?
+        SET bhandara_items = %s
+        WHERE flat_no = %s
     ''', (items, flat_no))
     conn.commit()
+    cursor.close()
     conn.close()
     
     return jsonify({'success': True, 'message': 'Bhandara donation updated'})
@@ -326,12 +357,14 @@ def add_admin_bhandara():
         return jsonify({'error': 'Flat number and items are required'}), 400
         
     conn = get_db_connection()
-    conn.execute('''
+    cursor = conn.cursor()
+    cursor.execute('''
         UPDATE flats 
-        SET bhandara_items = ?
-        WHERE flat_no = ?
+        SET bhandara_items = %s
+        WHERE flat_no = %s
     ''', (items, flat_no))
     conn.commit()
+    cursor.close()
     conn.close()
     
     return jsonify({'success': True, 'message': 'Donation added successfully'})
@@ -340,7 +373,10 @@ def add_admin_bhandara():
 @app.route('/api/flats', methods=['GET'])
 def get_flats():
     conn = get_db_connection()
-    flats = conn.execute('SELECT * FROM flats').fetchall()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT * FROM flats')
+    flats = cursor.fetchall()
+    cursor.close()
     conn.close()
     
     result = []
@@ -361,7 +397,10 @@ def get_flats():
 @app.route('/api/flats/<flat_no>', methods=['GET'])
 def get_flat(flat_no):
     conn = get_db_connection()
-    f = conn.execute('SELECT * FROM flats WHERE flat_no = ?', (flat_no,)).fetchone()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
+    f = cursor.fetchone()
+    cursor.close()
     conn.close()
     
     if not f:
@@ -393,10 +432,11 @@ def update_flat_api(flat_no):
     bhandara_items = data.get('bhandaraItems', '').strip()
     
     conn = get_db_connection()
-    existing = conn.execute('SELECT receipt_no FROM flats WHERE flat_no = ?', (flat_no,)).fetchone()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('SELECT receipt_no FROM flats WHERE flat_no = %s', (flat_no,))
+    existing = cursor.fetchone()
     existing_receipt = existing['receipt_no'] if existing else None
     
-    # Simple receipt number generator if paid and doesn't have one
     receipt_no = None
     if is_paid:
         receipt_no = data.get('receiptNo')
@@ -406,14 +446,16 @@ def update_flat_api(flat_no):
             import time
             receipt_no = f"RMV-2026-{flat_no}-{int(time.time()) % 10000}"
 
-    conn.execute('''
+    cursor.execute('''
         UPDATE flats 
-        SET owner_name = ?, is_paid = ?, amount_paid = ?, payment_date = ?, receipt_no = ?, received_by = ?, bhandara_items = ?
-        WHERE flat_no = ?
+        SET owner_name = %s, is_paid = %s, amount_paid = %s, payment_date = %s, receipt_no = %s, received_by = %s, bhandara_items = %s
+        WHERE flat_no = %s
     ''', (owner_name, int(is_paid), amount_paid, payment_date, receipt_no, received_by, bhandara_items, flat_no))
     conn.commit()
     
-    updated = conn.execute('SELECT * FROM flats WHERE flat_no = ?', (flat_no,)).fetchone()
+    cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
+    updated = cursor.fetchone()
+    cursor.close()
     conn.close()
     
     return jsonify({
@@ -430,11 +472,15 @@ def update_flat_api(flat_no):
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        total = conn.execute('SELECT COUNT(*) FROM flats').fetchone()[0]
-        paid = conn.execute('SELECT COUNT(*) FROM flats WHERE is_paid = 1').fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM flats')
+        total = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM flats WHERE is_paid = 1')
+        paid = cursor.fetchone()[0]
         unpaid = total - paid
-        amount = conn.execute('SELECT SUM(amount_paid) FROM flats').fetchone()[0] or 0.0
+        cursor.execute('SELECT SUM(amount_paid) FROM flats')
+        amount = cursor.fetchone()[0] or 0.0
         
         return jsonify({
             'total': total,
@@ -443,14 +489,17 @@ def get_stats():
             'totalAmount': amount
         })
     finally:
+        cursor.close()
         conn.close()
 
 # ---- Karykartas API ----
 @app.route('/api/karykartas', methods=['GET'])
 def get_karykartas():
     conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        karykartas = conn.execute('SELECT * FROM karykartas ORDER BY id ASC').fetchall()
+        cursor.execute('SELECT * FROM karykartas ORDER BY id ASC')
+        karykartas = cursor.fetchall()
         result = []
         for k in karykartas:
             result.append({
@@ -463,6 +512,7 @@ def get_karykartas():
             })
         return jsonify(result)
     finally:
+        cursor.close()
         conn.close()
 
 @app.route('/api/karykartas', methods=['POST'])
@@ -481,14 +531,17 @@ def add_karykarta():
         return jsonify({'success': False, 'message': 'Name and Position are required'}), 400
         
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        cursor = conn.execute('''
+        cursor.execute('''
             INSERT INTO karykartas (name, position, flat_no, photo_base64, details)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
         ''', (name, position, flat_no, photo_base64, details))
+        new_id = cursor.fetchone()[0]
         conn.commit()
-        return jsonify({'success': True, 'id': cursor.lastrowid})
+        return jsonify({'success': True, 'id': new_id})
     finally:
+        cursor.close()
         conn.close()
 
 @app.route('/api/karykartas/<int:id>', methods=['DELETE'])
@@ -497,18 +550,22 @@ def delete_karykarta(id):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 403
         
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        conn.execute('DELETE FROM karykartas WHERE id = ?', (id,))
+        cursor.execute('DELETE FROM karykartas WHERE id = %s', (id,))
         conn.commit()
         return jsonify({'success': True})
     finally:
+        cursor.close()
         conn.close()
 
 @app.route('/api/journey', methods=['GET'])
 def get_journey():
     conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        journey = conn.execute('SELECT * FROM journey ORDER BY year ASC').fetchall()
+        cursor.execute('SELECT * FROM journey ORDER BY year ASC')
+        journey = cursor.fetchall()
         result = []
         for j in journey:
             result.append({
@@ -517,6 +574,7 @@ def get_journey():
             })
         return jsonify(result)
     finally:
+        cursor.close()
         conn.close()
 
 @app.route('/api/admin/journey', methods=['POST'])
@@ -532,14 +590,17 @@ def update_journey():
         return jsonify({'success': False, 'message': 'Year and Image are required'}), 400
         
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        conn.execute('''
-            REPLACE INTO journey (year, image_base64)
-            VALUES (?, ?)
+        cursor.execute('''
+            INSERT INTO journey (year, image_base64)
+            VALUES (%s, %s)
+            ON CONFLICT (year) DO UPDATE SET image_base64 = EXCLUDED.image_base64
         ''', (year, image_base64))
         conn.commit()
         return jsonify({'success': True})
     finally:
+        cursor.close()
         conn.close()
 
 if __name__ == '__main__':
