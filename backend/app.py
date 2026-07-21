@@ -34,6 +34,7 @@ def init_db():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
+        # Create flats table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS flats (
                 flat_no TEXT PRIMARY KEY,
@@ -47,20 +48,23 @@ def init_db():
                 bhandara_items TEXT
             )
         ''')
+        conn.commit()
+
+        # Safely add columns if they don't exist (for older databases)
+        columns_to_add = [
+            ("received_by", "TEXT"),
+            ("bhandara_items", "TEXT")
+        ]
         
-        try:
-            cursor.execute('ALTER TABLE flats ADD COLUMN received_by TEXT')
-        except psycopg2.errors.DuplicateColumn:
-            conn.rollback()
-        else:
-            conn.commit()
-            
-        try:
-            cursor.execute('ALTER TABLE flats ADD COLUMN bhandara_items TEXT')
-        except psycopg2.errors.DuplicateColumn:
-            conn.rollback()
-        else:
-            conn.commit()
+        for col_name, col_type in columns_to_add:
+            cursor.execute('''
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='flats' AND column_name=%s
+            ''', (col_name,))
+            if not cursor.fetchone():
+                cursor.execute(f'ALTER TABLE flats ADD COLUMN {col_name} {col_type}')
+                conn.commit()
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -95,6 +99,7 @@ def init_db():
         ''')
         conn.commit()
 
+        # Insert default flats
         cursor.execute('SELECT COUNT(*) FROM flats')
         count = cursor.fetchone()[0]
         if count == 0:
@@ -112,6 +117,7 @@ def init_db():
             ''', flats_to_insert)
             conn.commit()
 
+        # Insert default admin user
         cursor.execute('SELECT * FROM users WHERE email = %s', ('admin@vargani.com',))
         admin = cursor.fetchone()
         if not admin:
@@ -124,7 +130,9 @@ def init_db():
         cursor.close()
         conn.close()
     except Exception as e:
+        import traceback
         print("Database initialization skipped or failed:", e)
+        traceback.print_exc()
 
 init_db()
 
@@ -146,6 +154,18 @@ def user_page():
     return render_template('user.html')
 
 # --- Authentication API ---
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        cursor.close()
+        conn.close()
+        return jsonify({'status': 'ok', 'database': 'connected'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'database': 'disconnected', 'error': str(e)}), 500
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.json or {}
