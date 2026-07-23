@@ -724,59 +724,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadJourneyData();
     loadUsers();
 
+    function handleLogoUpload(file) {
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 500;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const base64 = canvas.toDataURL('image/png');
+          
+          const preview = document.getElementById('currentLogoPreview');
+          if (preview) preview.src = base64;
+
+          try {
+            const res = await fetch('/api/admin/logo', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({imageBase64: base64})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showToast('Logo updated successfully!', 'success');
+              const t = new Date().getTime();
+              document.querySelectorAll('img[src*="logo.png"]').forEach(el => {
+                el.src = '/static/images/logo.png?t=' + t;
+              });
+            } else {
+              showToast(data.message || 'Failed to upload logo.', 'error');
+            }
+          } catch (err) {
+            console.error(err);
+            showToast('Error uploading logo.', 'error');
+          }
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
     const logoUpload = document.getElementById('logoUpload');
     if (logoUpload) {
-      logoUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const img = new Image();
-          img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            const MAX_SIZE = 400;
-            let width = img.width;
-            let height = img.height;
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height *= MAX_SIZE / width;
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width *= MAX_SIZE / height;
-                height = MAX_SIZE;
-              }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            const base64 = canvas.toDataURL('image/png');
-            try {
-              const res = await fetch('/api/admin/logo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({imageBase64: base64})
-              });
-              const data = await res.json();
-              if (res.ok && data.success) {
-                showToast('Logo updated successfully!', 'success');
-                setTimeout(() => window.location.reload(), 1000);
-              } else {
-                showToast(data.message || 'Failed to upload logo.', 'error');
-              }
-            } catch (err) {
-              console.error(err);
-              showToast('Error uploading logo.', 'error');
-            }
-          };
-          img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-      });
+      logoUpload.addEventListener('change', (e) => handleLogoUpload(e.target.files[0]));
+    }
+    const logoUploadSection = document.getElementById('logoUploadSection');
+    if (logoUploadSection) {
+      logoUploadSection.addEventListener('change', (e) => handleLogoUpload(e.target.files[0]));
     }
   }
 });

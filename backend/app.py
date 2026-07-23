@@ -97,6 +97,13 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        ''')
         conn.commit()
 
         # Insert default flats
@@ -314,6 +321,47 @@ def api_session():
 
 import base64
 import os
+from flask import Response
+
+@app.route('/static/images/logo.png', methods=['GET'])
+def get_site_logo():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = 'logo_base64'")
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row and row[0]:
+            image_b64 = row[0]
+            if "," in image_b64:
+                header, encoded = image_b64.split(",", 1)
+            else:
+                encoded = image_b64
+            img_bytes = base64.b64decode(encoded)
+            res = Response(img_bytes, mimetype='image/png')
+            res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            res.headers['Pragma'] = 'no-cache'
+            res.headers['Expires'] = '0'
+            return res
+    except Exception as e:
+        print("Error serving logo from DB:", e)
+        
+    # Fallback to local file if not in DB
+    try:
+        images_dir = os.path.join(app.static_folder, 'images')
+        local_path = os.path.join(images_dir, 'logo.png')
+        if os.path.exists(local_path):
+            with open(local_path, 'rb') as f:
+                img_bytes = f.read()
+            res = Response(img_bytes, mimetype='image/png')
+            res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return res
+    except Exception as e:
+        print("Error serving fallback logo:", e)
+
+    return "Logo not found", 404
 
 @app.route('/api/admin/logo', methods=['POST'])
 def api_admin_logo():
@@ -324,24 +372,37 @@ def api_admin_logo():
     image_b64 = data.get('imageBase64')
     if image_b64:
         try:
-            if "," in image_b64:
-                header, encoded = image_b64.split(",", 1)
-            else:
-                encoded = image_b64
-            img_data = base64.b64decode(encoded)
+            # 1. Store in DB
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO settings (key, value)
+                VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            ''', ('logo_base64', image_b64))
+            conn.commit()
+            cursor.close()
+            conn.close()
             
-            # Save directly to app static folder (frontend/static/images)
-            images_dir = os.path.join(app.static_folder, 'images')
-            os.makedirs(images_dir, exist_ok=True)
-            logo_path = os.path.join(images_dir, 'logo.png')
-            with open(logo_path, 'wb') as f:
-                f.write(img_data)
+            # 2. File backup
+            try:
+                if "," in image_b64:
+                    header, encoded = image_b64.split(",", 1)
+                else:
+                    encoded = image_b64
+                img_data = base64.b64decode(encoded)
                 
-            # Also save to frontend_dir static images as backup
-            backup_dir = os.path.join(frontend_dir, 'static', 'images')
-            os.makedirs(backup_dir, exist_ok=True)
-            with open(os.path.join(backup_dir, 'logo.png'), 'wb') as f:
-                f.write(img_data)
+                images_dir = os.path.join(app.static_folder, 'images')
+                os.makedirs(images_dir, exist_ok=True)
+                with open(os.path.join(images_dir, 'logo.png'), 'wb') as f:
+                    f.write(img_data)
+                    
+                backup_dir = os.path.join(frontend_dir, 'static', 'images')
+                os.makedirs(backup_dir, exist_ok=True)
+                with open(os.path.join(backup_dir, 'logo.png'), 'wb') as f:
+                    f.write(img_data)
+            except Exception as fe:
+                print("Failed local file backup:", fe)
 
             return jsonify({'success': True, 'message': 'Logo updated successfully'})
         except Exception as e:
