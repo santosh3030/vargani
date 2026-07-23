@@ -346,6 +346,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     reader.readAsDataURL(file);
   });
 
+  // ---- User Management ----
+  let allUsers = [];
+
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) {
+        allUsers = await res.json();
+      } else {
+        console.error('Failed to load users');
+        allUsers = [];
+      }
+      renderUsers();
+    } catch (err) {
+      console.error('Error loading users:', err);
+      allUsers = [];
+      renderUsers();
+    }
+  }
+
+  function renderUsers() {
+    const container = document.getElementById('usersContainer');
+    if (!container) return;
+
+    if (allUsers.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted); background:var(--bg-secondary); border-radius:12px; border:1px solid var(--border-color);">No registered users found.</div>`;
+      return;
+    }
+
+    container.innerHTML = allUsers.map(u => `
+      <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-weight:600; font-size:1.1rem; color:var(--text-primary);">${u.name} <span style="font-size:0.8rem; font-weight:400; color:var(--text-muted); margin-left:8px;">(${u.role})</span></div>
+          <div style="font-size:0.9rem; color:var(--text-secondary); margin-top:3px;">📧 Email: <strong>${u.email}</strong></div>
+          <div style="font-size:0.85rem; color:var(--text-muted); margin-top:5px;">
+             🏢 <strong>Flat No:</strong> <span style="color:var(--accent-primary); font-weight:600;">${u.flatNo || 'Not Assigned'}</span> 
+             | 🔒 <strong>Password:</strong> Encrypted (SHA-256 Hash: <code>${u.passwordHash ? u.passwordHash.substring(0, 8) + '...' : 'N/A'}</code>)
+          </div>
+        </div>
+        <div style="display:flex; gap: 10px;">
+          <button class="btn btn-secondary edit-user" data-id="${u.id}" data-name="${u.name} (${u.email})" data-flat="${u.flatNo || ''}">✏️ Edit Flat/Pass</button>
+          <button class="btn delete-user" style="background:var(--danger); color:white; border:none;" data-id="${u.id}" data-name="${u.name}">🗑️ Delete User</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
   // ---- Event Listeners ----
   function setupEventListeners() {
     // Floor tabs
@@ -581,18 +628,101 @@ document.addEventListener('DOMContentLoaded', async () => {
       reader.readAsDataURL(file);
     };
 
+    // Admin Users UI
+    const editUserModal = document.getElementById('editUserModal');
+    
+    window.closeUserModal = function() {
+      if(editUserModal) editUserModal.classList.remove('show');
+    };
+
+    if (document.getElementById('userModalClose')) {
+      document.getElementById('userModalClose').addEventListener('click', closeUserModal);
+    }
+    if (document.getElementById('cancelUserEdit')) {
+      document.getElementById('cancelUserEdit').addEventListener('click', closeUserModal);
+    }
+
+    if (document.getElementById('usersContainer')) {
+      document.getElementById('usersContainer').addEventListener('click', async (e) => {
+        // Edit User
+        if (e.target.classList.contains('edit-user')) {
+          const id = e.target.dataset.id;
+          const name = e.target.dataset.name;
+          const flatNo = e.target.dataset.flat;
+
+          document.getElementById('editUserId').value = id;
+          document.getElementById('editUserName').value = name;
+          document.getElementById('editUserFlat').value = flatNo;
+          document.getElementById('editUserPassword').value = '';
+          
+          editUserModal.classList.add('show');
+        }
+
+        // Delete User
+        if (e.target.classList.contains('delete-user')) {
+          const userName = e.target.dataset.name || 'this user';
+          if (!confirm(`Are you sure you want to delete ${userName}? They will have to register again.`)) return;
+          const id = e.target.dataset.id;
+          
+          try {
+            const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+              showToast('User deleted successfully.', 'success');
+              loadUsers();
+            } else {
+              showToast('Failed to delete user', 'error');
+            }
+          } catch (err) {
+            console.error('Error deleting user:', err);
+            showToast('Network error while deleting user', 'error');
+          }
+        }
+      });
+    }
+
+    if (document.getElementById('editUserForm')) {
+      document.getElementById('editUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editUserId').value;
+        const flatNo = document.getElementById('editUserFlat').value.trim();
+        const newPassword = document.getElementById('editUserPassword').value.trim();
+
+        try {
+          const res = await fetch(`/api/admin/users/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ flatNo, newPassword })
+          });
+          const result = await res.json();
+          
+          if (res.ok && result.success) {
+            showToast('User account updated successfully!', 'success');
+            closeUserModal();
+            loadUsers();
+          } else {
+            showToast(result.error || 'Failed to update user', 'error');
+          }
+        } catch (err) {
+          console.error('Error updating user:', err);
+          showToast('Network error while updating user', 'error');
+        }
+      });
+    }
+
     // Keyboard shortcut - Escape to close modal
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeEditModal();
         closeKarykartaModal();
         if (typeof closeBhandaraModal !== 'undefined') closeBhandaraModal();
+        if (typeof closeUserModal !== 'undefined') closeUserModal();
       }
     });
 
     // Initial load
     loadKarykartas();
     loadJourneyData();
+    loadUsers();
 
     const logoUpload = document.getElementById('logoUpload');
     if (logoUpload) {

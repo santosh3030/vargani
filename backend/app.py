@@ -389,6 +389,83 @@ def add_admin_bhandara():
     
     return jsonify({'success': True, 'message': 'Donation added successfully'})
 
+# --- User Management API ---
+@app.route('/api/admin/users', methods=['GET'])
+def get_admin_users():
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute("SELECT id, name, email, password, flat_no, role, created_at FROM users WHERE role != 'admin' ORDER BY created_at DESC")
+    users = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    result = []
+    for u in users:
+        result.append({
+            'id': u['id'],
+            'name': u['name'],
+            'email': u['email'],
+            'passwordHash': u['password'],
+            'flatNo': u['flat_no'],
+            'role': u['role'],
+            'createdAt': u['created_at'].isoformat() if u['created_at'] else None
+        })
+    return jsonify(result)
+
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+def update_admin_user(user_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    data = request.json or {}
+    new_flat_no = data.get('flatNo', '').strip()
+    new_password = data.get('newPassword', '').strip()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    if new_flat_no:
+        cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (new_flat_no,))
+        flat = cursor.fetchone()
+        if not flat:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Invalid flat number'}), 400
+            
+        cursor.execute('UPDATE users SET flat_no = %s WHERE id = %s', (new_flat_no, user_id))
+    else:
+        cursor.execute('UPDATE users SET flat_no = NULL WHERE id = %s', (user_id,))
+        
+    if new_password:
+        if len(new_password) < 4:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Password must be at least 4 characters'}), 400
+        cursor.execute('UPDATE users SET password = %s WHERE id = %s', (hash_password(new_password), user_id))
+        
+    conn.commit()
+    cursor.close()
+    conn.close()
+        
+    return jsonify({'success': True, 'message': 'User updated successfully'})
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+def delete_admin_user(user_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE id = %s AND role != %s', (user_id, 'admin'))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'User deleted successfully'})
+
 # --- Flat Management API ---
 @app.route('/api/flats', methods=['GET'])
 def get_flats():

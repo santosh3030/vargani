@@ -47,6 +47,9 @@
         <button class="nav-item" data-section="journeySection">
           <span class="nav-icon">📅</span> Journey 2010-25
         </button>
+        <button class="nav-item" data-section="usersSection">
+          <span class="nav-icon">👥</span> Users
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -118,6 +121,17 @@
           <p style="color:var(--text-secondary); margin-top:5px; font-size:0.9rem;">Click on a year to upload/update its image.</p>
         </div>
         <div id="journeyContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Users Section -->
+      <div class="users-section content-section" id="usersSection" style="display:none;">
+        <div class="section-header">
+          <h2>👥 Registered Users</h2>
+          <p style="color:var(--text-secondary); margin-top:5px; font-size:0.9rem;">Manage user accounts and correct flat numbers.</p>
+        </div>
+        <div id="usersContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
           <!-- Rendered by JS -->
         </div>
       </div>
@@ -258,6 +272,35 @@
     </div>
   </div>
 
+  <!-- Edit User Modal -->
+  <div class="modal-overlay" id="editUserModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>✏️ Edit User Account</h3>
+        <button class="modal-close" id="userModalClose">✕</button>
+      </div>
+      <form id="editUserForm">
+        <input type="hidden" id="editUserId">
+        <div class="form-group">
+          <label>User Name & Email</label>
+          <input type="text" id="editUserName" disabled style="background: var(--bg-secondary); cursor: not-allowed; border: 1px solid var(--border-color); color: var(--text-secondary);">
+        </div>
+        <div class="form-group">
+          <label for="editUserFlat">Flat Number</label>
+          <input type="text" id="editUserFlat" placeholder="Enter correct flat no (e.g. 101)">
+        </div>
+        <div class="form-group">
+          <label for="editUserPassword">Reset Password (Optional)</label>
+          <input type="password" id="editUserPassword" placeholder="Leave blank to keep existing password">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancelUserEdit">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/static/js/app.js"></script>
   <script src="/static/js/admin.js"></script>
 
@@ -275,6 +318,7 @@
         document.getElementById('karykartaSection').style.display = targetId === 'karykartaSection' ? 'block' : 'none';
         document.getElementById('bhandaraSection').style.display = targetId === 'bhandaraSection' ? 'block' : 'none';
         document.getElementById('journeySection').style.display = targetId === 'journeySection' ? 'block' : 'none';
+        document.getElementById('usersSection').style.display = targetId === 'usersSection' ? 'block' : 'none';
 
         // Update top-bar title
         const topTitle = document.querySelector('.top-bar h1');
@@ -283,6 +327,7 @@
         if (targetId === 'karykartaSection') topTitle.textContent = 'Karykartas';
         if (targetId === 'bhandaraSection') topTitle.textContent = 'Bhandara Donations';
         if (targetId === 'journeySection') topTitle.textContent = 'Journey 2010-2025';
+        if (targetId === 'usersSection') topTitle.textContent = 'Registered Users';
 
         // Close mobile sidebar
         document.getElementById('sidebar').classList.remove('open');
