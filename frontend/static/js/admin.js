@@ -729,25 +729,51 @@ document.addEventListener('DOMContentLoaded', async () => {
       logoUpload.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        
         const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const base64 = ev.target.result;
-          try {
-            const res = await fetch('/api/admin/logo', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({imageBase64: base64})
-            });
-            if (res.ok) {
-              alert('Logo updated successfully!');
-              window.location.reload();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 400;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
             } else {
-              alert('Failed to upload logo.');
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
             }
-          } catch (err) {
-            console.error(err);
-            alert('Error uploading logo.');
-          }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const base64 = canvas.toDataURL('image/png');
+            try {
+              const res = await fetch('/api/admin/logo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({imageBase64: base64})
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                showToast('Logo updated successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+              } else {
+                showToast(data.message || 'Failed to upload logo.', 'error');
+              }
+            } catch (err) {
+              console.error(err);
+              showToast('Error uploading logo.', 'error');
+            }
+          };
+          img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
       });

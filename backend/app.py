@@ -317,7 +317,7 @@ import os
 
 @app.route('/api/admin/logo', methods=['POST'])
 def api_admin_logo():
-    if 'admin' not in session.get('role', ''):
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': 'Unauthorized'}), 403
     
     data = request.json or {}
@@ -329,11 +329,21 @@ def api_admin_logo():
             else:
                 encoded = image_b64
             img_data = base64.b64decode(encoded)
-            images_dir = os.path.join(app.root_path, 'static', 'images')
+            
+            # Save directly to app static folder (frontend/static/images)
+            images_dir = os.path.join(app.static_folder, 'images')
             os.makedirs(images_dir, exist_ok=True)
-            with open(os.path.join(images_dir, 'logo.png'), 'wb') as f:
+            logo_path = os.path.join(images_dir, 'logo.png')
+            with open(logo_path, 'wb') as f:
                 f.write(img_data)
-            return jsonify({'success': True})
+                
+            # Also save to frontend_dir static images as backup
+            backup_dir = os.path.join(frontend_dir, 'static', 'images')
+            os.makedirs(backup_dir, exist_ok=True)
+            with open(os.path.join(backup_dir, 'logo.png'), 'wb') as f:
+                f.write(img_data)
+
+            return jsonify({'success': True, 'message': 'Logo updated successfully'})
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)}), 500
     return jsonify({'success': False, 'message': 'No image provided'}), 400
