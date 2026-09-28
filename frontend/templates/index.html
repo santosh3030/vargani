@@ -7,15 +7,18 @@
   <title>Rambaugchi Matarani 2026 | Rambaugchi Matarani Vargani</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('img[src^="/static/images/logo.png"]').forEach(img => {
-        img.src = '/static/images/logo.png?t=' + new Date().getTime();
-      });
-    });
+    // Early non-blocking server wakeup ping
+    (function() {
+      try { fetch('/api/ping', { cache: 'no-store' }).catch(function(){}); } catch(e){}
+    })();
   </script>
-
 </head>
 <body>
+  <!-- Server Warmup Banner -->
+  <div id="serverWarmupBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:99999; background: linear-gradient(90deg, #ff9800, #e65100); color: #fff; text-align: center; padding: 10px 15px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease;">
+    ⚡ Waking up server... First visit after inactivity may take a few seconds.
+  </div>
+
   <!-- Background Animation -->
   <div class="bg-animation">
     <div class="orb"></div>
@@ -167,7 +170,35 @@
 
   <script src="/static/js/app.js"></script>
   <script>
+    // Instant Flat Dropdown Pre-fill
+    function populateFlatDropdownsInstant() {
+      const quickFlatSelect = document.getElementById('quickFlatNo');
+      const signUpFlatSelect = document.getElementById('signUpFlat');
+      const forgotFlatSelect = document.getElementById('forgotFlat');
+      if (!quickFlatSelect) return;
+      if (quickFlatSelect.options.length > 1) return;
+
+      const createOpt = (flatNo, floor) => {
+        const opt = document.createElement('option');
+        opt.value = flatNo;
+        opt.textContent = `Flat ${flatNo} - ${floor === 0 ? 'Ground Floor' : 'Floor ' + floor}`;
+        return opt;
+      };
+
+      for (let floor = 0; floor <= 7; floor++) {
+        for (let flat = 1; flat <= 24; flat++) {
+          const flatNo = `${floor}${String(flat).padStart(2, '0')}`;
+          quickFlatSelect.appendChild(createOpt(flatNo, floor));
+          if (signUpFlatSelect) signUpFlatSelect.appendChild(createOpt(flatNo, floor));
+          if (forgotFlatSelect) forgotFlatSelect.appendChild(createOpt(flatNo, floor));
+        }
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Instant flat numbers populating (<1ms) so dropdown is never empty
+      populateFlatDropdownsInstant();
+
       // Setup mobile video if on mobile
       const loginVideo = document.getElementById('loginVideo');
       if (loginVideo) {
@@ -178,56 +209,63 @@
         }
       }
 
-      // Check session from backend
+      // Show warmup banner if backend takes > 1.2s to wake up
+      const warmupBanner = document.getElementById('serverWarmupBanner');
+      const warmTimer = setTimeout(() => {
+        if (warmupBanner) warmupBanner.style.display = 'block';
+      }, 1200);
+
+      // 2. Parallel fetching of session & flats
       try {
-        const res = await fetch('/api/session');
-        const sessionData = await res.json();
-        if (sessionData.loggedIn) {
-          if (sessionData.role === 'admin') {
-            window.location.href = '/admin';
-          } else {
-            window.location.href = '/user';
-          }
-          return;
+        const [sessionRes, flatsRes] = await Promise.allSettled([
+          fetch('/api/session'),
+          fetch('/api/flats')
+        ]);
+
+        clearTimeout(warmTimer);
+        if (warmupBanner) warmupBanner.style.display = 'none';
+
+        // Process session
+        if (sessionRes.status === 'fulfilled') {
+          try {
+            const sessionData = await sessionRes.value.json();
+            if (sessionData && sessionData.loggedIn) {
+              if (sessionData.role === 'admin') {
+                window.location.href = '/admin';
+              } else {
+                window.location.href = '/user';
+              }
+              return;
+            }
+          } catch(e) {}
+        }
+
+        // Process flats to update owner names
+        if (flatsRes.status === 'fulfilled') {
+          try {
+            const flats = await flatsRes.value.json();
+            if (Array.isArray(flats)) {
+              const map = {};
+              flats.forEach(f => { map[f.flatNo] = f; });
+              ['quickFlatNo', 'signUpFlat', 'forgotFlat'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                Array.from(sel.options).forEach(opt => {
+                  if (opt.value && map[opt.value]) {
+                    const f = map[opt.value];
+                    const floorText = f.floor === 0 ? 'Ground Floor' : `Floor ${f.floor}`;
+                    const owner = f.ownerName ? ` (${f.ownerName})` : '';
+                    opt.textContent = `Flat ${f.flatNo} - ${floorText}${owner}`;
+                  }
+                });
+              });
+            }
+          } catch(e) {}
         }
       } catch (err) {
-        console.error('Session check failed:', err);
-      }
-
-      const tabQuickCheck = document.getElementById('tabQuickCheck');
-      const tabSignIn = document.getElementById('tabSignIn');
-      const tabSignUp = document.getElementById('tabSignUp');
-      const tabJourney = document.getElementById('tabJourney');
-      
-      const quickCheckForm = document.getElementById('quickCheckForm');
-      const signInForm = document.getElementById('signInForm');
-      const signUpForm = document.getElementById('signUpForm');
-      const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-      const journeySection = document.getElementById('journeySection');
-      
-      const quickFlatSelect = document.getElementById('quickFlatNo');
-      const signUpFlatSelect = document.getElementById('signUpFlat');
-      const forgotFlatSelect = document.getElementById('forgotFlat');
-
-      // Populate flat dropdown from backend API
-      try {
-        const flatsRes = await fetch('/api/flats');
-        const flats = await flatsRes.json();
-        
-        const createOption = (flat) => {
-          const opt = document.createElement('option');
-          opt.value = flat.flatNo;
-          opt.textContent = `Flat ${flat.flatNo} - ${flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`}${flat.ownerName ? ' (' + flat.ownerName + ')' : ''}`;
-          return opt;
-        };
-
-        flats.forEach(flat => {
-          quickFlatSelect.appendChild(createOption(flat));
-          signUpFlatSelect.appendChild(createOption(flat));
-          if (forgotFlatSelect) forgotFlatSelect.appendChild(createOption(flat));
-        });
-      } catch (err) {
-        console.error('Failed to load flats:', err);
+        clearTimeout(warmTimer);
+        if (warmupBanner) warmupBanner.style.display = 'none';
+        console.error('Initial data fetch failed:', err);
       }
 
       // Load Journey Data

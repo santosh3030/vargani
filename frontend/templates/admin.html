@@ -9,9 +9,19 @@
   <title>Admin Panel | Rambaugchi Matarani 2026</title>
   <link rel="stylesheet" href="/static/css/style.css">
 
+  <script>
+    // Early non-blocking server wakeup ping
+    (function() {
+      try { fetch('/api/ping', { cache: 'no-store' }).catch(function(){}); } catch(e){}
+    })();
+  </script>
 </head>
 
 <body>
+  <!-- Server Warmup Banner -->
+  <div id="serverWarmupBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:99999; background: linear-gradient(90deg, #ff9800, #e65100); color: #fff; text-align: center; padding: 10px 15px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease;">
+    ⚡ Connecting to server... Please wait a moment.
+  </div>
   <!-- Background Animation -->
   <div class="bg-animation">
     <div class="orb"></div>

@@ -19,15 +19,67 @@ CORS(app, supports_credentials=True)
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 
+import time
+from psycopg2.pool import ThreadedConnectionPool
+
 # --- Database Config ---
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/vargani')
 
+# --- Connection Pool Setup ---
+db_pool = None
+
+def get_pool():
+    global db_pool
+    if db_pool is None or getattr(db_pool, 'closed', False):
+        try:
+            db_pool = ThreadedConnectionPool(1, 10, DATABASE_URL)
+        except Exception as e:
+            print("Connection pool initialization warning:", e)
+            db_pool = None
+    return db_pool
+
+class PooledConnectionWrapper:
+    """Wrapper that returns connection to pool when .close() is called."""
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        if self._pool and self._conn and not getattr(self._conn, 'closed', False):
+            try:
+                self._pool.putconn(self._conn)
+            except Exception:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+            self._conn = None
+        elif self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    pool = get_pool()
+    if pool:
+        try:
+            raw_conn = pool.getconn()
+            if raw_conn.closed != 0:
+                pool.putconn(raw_conn, close=True)
+                raw_conn = pool.getconn()
+            return PooledConnectionWrapper(pool, raw_conn)
+        except Exception as e:
+            print("Failed to get pooled connection, falling back to direct:", e)
+    return psycopg2.connect(DATABASE_URL)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def init_db():
     try:
@@ -160,7 +212,16 @@ def user_page():
         return redirect(url_for('index'))
     return render_template('user.html')
 
-# --- Authentication API ---
+# --- Authentication & Ping API ---
+@app.route('/api/ping', methods=['GET', 'HEAD'])
+def api_ping():
+    """Ultra-fast wakeup ping route without database access"""
+    return jsonify({
+        'status': 'pong',
+        'timestamp': time.time(),
+        'service': 'Rambaugchi Matarani 2026 API'
+    })
+
 @app.route('/api/health', methods=['GET'])
 def api_health():
     try:
@@ -323,8 +384,16 @@ import base64
 import os
 from flask import Response
 
+_logo_cache = None
+
 @app.route('/static/images/logo.png', methods=['GET'])
 def get_site_logo():
+    global _logo_cache
+    if _logo_cache is not None:
+        res = Response(_logo_cache, mimetype='image/png')
+        res.headers['Cache-Control'] = 'public, max-age=86400'
+        return res
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -340,10 +409,9 @@ def get_site_logo():
             else:
                 encoded = image_b64
             img_bytes = base64.b64decode(encoded)
+            _logo_cache = img_bytes
             res = Response(img_bytes, mimetype='image/png')
-            res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            res.headers['Pragma'] = 'no-cache'
-            res.headers['Expires'] = '0'
+            res.headers['Cache-Control'] = 'public, max-age=86400'
             return res
     except Exception as e:
         print("Error serving logo from DB:", e)
@@ -355,8 +423,9 @@ def get_site_logo():
         if os.path.exists(local_path):
             with open(local_path, 'rb') as f:
                 img_bytes = f.read()
+            _logo_cache = img_bytes
             res = Response(img_bytes, mimetype='image/png')
-            res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            res.headers['Cache-Control'] = 'public, max-age=86400'
             return res
     except Exception as e:
         print("Error serving fallback logo:", e)
@@ -365,6 +434,7 @@ def get_site_logo():
 
 @app.route('/api/admin/logo', methods=['POST'])
 def api_admin_logo():
+    global _logo_cache
     if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': 'Unauthorized'}), 403
     
@@ -384,6 +454,9 @@ def api_admin_logo():
             cursor.close()
             conn.close()
             
+            # Clear in-memory logo cache
+            _logo_cache = None
+            
             # 2. File backup
             try:
                 if "," in image_b64:
@@ -391,6 +464,7 @@ def api_admin_logo():
                 else:
                     encoded = image_b64
                 img_data = base64.b64decode(encoded)
+                _logo_cache = img_data
                 
                 images_dir = os.path.join(app.static_folder, 'images')
                 os.makedirs(images_dir, exist_ok=True)

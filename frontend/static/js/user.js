@@ -3,14 +3,26 @@
    ============================================ */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const warmupBanner = document.getElementById('serverWarmupBanner');
+  const warmTimer = setTimeout(() => {
+    if (warmupBanner) warmupBanner.style.display = 'block';
+  }, 1200);
+
   const auth = await requireAuth('user');
-  if (!auth) return;
+  if (!auth) {
+    clearTimeout(warmTimer);
+    if (warmupBanner) warmupBanner.style.display = 'none';
+    return;
+  }
 
   const flatNo = auth.flatNo;
   let flat = null;
 
   try {
     flat = await getFlatById(flatNo);
+    clearTimeout(warmTimer);
+    if (warmupBanner) warmupBanner.style.display = 'none';
+
     renderFlatDetails(flat);
     
     // Pre-fill bhandara items if already donated
@@ -21,6 +33,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderBuildingOverview(flatNo);
     setupEventListeners();
   } catch (err) {
+    clearTimeout(warmTimer);
+    if (warmupBanner) warmupBanner.style.display = 'none';
     console.error('Failed to initialize resident panel:', err);
     showToast('Failed to load details from server', 'error');
     setTimeout(() => logout(), 2000);

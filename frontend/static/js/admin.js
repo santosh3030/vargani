@@ -3,12 +3,17 @@
    ============================================ */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  document.querySelectorAll('img[src^="/static/images/logo.png"]').forEach(img => {
-    img.src = '/static/images/logo.png?t=' + new Date().getTime();
-  });
+  const warmupBanner = document.getElementById('serverWarmupBanner');
+  const warmTimer = setTimeout(() => {
+    if (warmupBanner) warmupBanner.style.display = 'block';
+  }, 1200);
 
   const auth = await requireAuth('admin');
-  if (!auth) return;
+  if (!auth) {
+    clearTimeout(warmTimer);
+    if (warmupBanner) warmupBanner.style.display = 'none';
+    return;
+  }
 
   let currentFloor = 'all'; // 'all' = all floors
   let editingFlat = null;
@@ -41,42 +46,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ---- Load/Refresh Data ----
   async function refreshData() {
     try {
-      allFlatsCache = await getAllFlats();
-      await renderStats();
-      renderBuilding();
-      renderBhandara();
+      const [flatsRes, statsRes] = await Promise.allSettled([
+        getAllFlats(),
+        getStats()
+      ]);
+
+      clearTimeout(warmTimer);
+      if (warmupBanner) warmupBanner.style.display = 'none';
+
+      if (flatsRes.status === 'fulfilled') {
+        allFlatsCache = flatsRes.value;
+        renderBuilding();
+        renderBhandara();
+      }
+      if (statsRes.status === 'fulfilled') {
+        renderStatsWithData(statsRes.value);
+      }
     } catch (err) {
+      clearTimeout(warmTimer);
+      if (warmupBanner) warmupBanner.style.display = 'none';
       console.error('Error refreshing data:', err);
       showToast('Error refreshing data from server', 'error');
     }
   }
 
   // ---- Render Stats ----
+  function renderStatsWithData(stats) {
+    if (!statsGrid || !stats) return;
+    statsGrid.innerHTML = `
+      <div class="stat-card total">
+        <div class="stat-icon">🏢</div>
+        <div class="stat-value">${stats.total}</div>
+        <div class="stat-label">Total Flats</div>
+      </div>
+      <div class="stat-card paid">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">${stats.paid}</div>
+        <div class="stat-label">Paid</div>
+      </div>
+      <div class="stat-card unpaid">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-value">${stats.unpaid}</div>
+        <div class="stat-label">Unpaid</div>
+      </div>
+      <div class="stat-card amount">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value">${formatCurrency(stats.totalAmount)}</div>
+        <div class="stat-label">Total Collected</div>
+      </div>
+    `;
+  }
+
   async function renderStats() {
     try {
       const stats = await getStats();
-      statsGrid.innerHTML = `
-        <div class="stat-card total">
-          <div class="stat-icon">🏢</div>
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total Flats</div>
-        </div>
-        <div class="stat-card paid">
-          <div class="stat-icon">✅</div>
-          <div class="stat-value">${stats.paid}</div>
-          <div class="stat-label">Paid</div>
-        </div>
-        <div class="stat-card unpaid">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-value">${stats.unpaid}</div>
-          <div class="stat-label">Unpaid</div>
-        </div>
-        <div class="stat-card amount">
-          <div class="stat-icon">💰</div>
-          <div class="stat-value">${formatCurrency(stats.totalAmount)}</div>
-          <div class="stat-label">Total Collected</div>
-        </div>
-      `;
+      renderStatsWithData(stats);
     } catch (err) {
       console.error('Error loading stats:', err);
     }
