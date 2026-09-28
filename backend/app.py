@@ -268,10 +268,17 @@ def api_login():
         'flatNo': user['flat_no']
     })
 
-@app.route('/api/quick-status', methods=['POST'])
+@app.route('/api/quick-status', methods=['GET', 'POST', 'OPTIONS'])
 def api_quick_status():
-    data = request.json or {}
-    flat_no = data.get('flatNo', '').strip()
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    flat_no = ''
+    if request.method == 'GET':
+        flat_no = request.args.get('flatNo', '').strip()
+    else:
+        data = request.json or {}
+        flat_no = data.get('flatNo', '').strip()
     
     if not flat_no:
         return jsonify({'success': False, 'message': 'Flat number is required'}), 400

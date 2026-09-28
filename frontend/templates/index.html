@@ -241,11 +241,12 @@
           } catch(e) {}
         }
 
-        // Process flats to update owner names
+        // Process flats to update owner names & cache flats data
         if (flatsRes.status === 'fulfilled') {
           try {
             const flats = await flatsRes.value.json();
             if (Array.isArray(flats)) {
+              window.cachedFlatsData = flats;
               const map = {};
               flats.forEach(f => { map[f.flatNo] = f; });
               ['quickFlatNo', 'signUpFlat', 'forgotFlat'].forEach(id => {
@@ -456,51 +457,102 @@
         e.preventDefault();
         const flatNo = quickFlatSelect.value;
         const resultContainer = document.getElementById('quickCheckResult');
+        const errEl = document.getElementById('quickCheckError');
+        if (errEl) errEl.classList.remove('show');
         resultContainer.style.display = 'none';
 
         if (!flatNo) return;
 
+        function renderResultCard(flatData) {
+          resultContainer.style.display = 'block';
+          window.lastQuickResult = flatData;
+          const isPaid = Boolean(flatData.isPaid);
+          const ownerName = flatData.ownerName || '';
+          const amount = flatData.amountPaid || flatData.amount || 0;
+          const paymentMode = flatData.paymentMode || 'Cash';
+          const paymentDate = flatData.paymentDate;
+
+          if (isPaid) {
+            const formattedDate = safeFormatDate(paymentDate);
+            resultContainer.innerHTML = `
+              <div style="font-size:3rem; margin-bottom:10px;">✅</div>
+              <div style="font-size:1.5rem; font-weight:700; color:var(--success);">PAID</div>
+              <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${flatData.flatNo}${ownerName ? ' • ' + ownerName : ''}</div>
+              <div style="color:var(--text-secondary); margin-top:4px; font-size:0.95rem;">Amount Paid: <strong>₹${amount}</strong> (${paymentMode === 'Online' ? '💳 Online / UPI' : '💵 Cash'})</div>
+              ${paymentDate ? `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Date: ${formattedDate}</div>` : ''}
+              <div style="margin-top:18px;">
+                <button type="button" class="btn btn-primary" onclick="downloadQuickReceipt(window.lastQuickResult)" style="padding:10px 20px; font-size:0.95rem; border-radius:8px; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                  📄 Download Receipt (PDF)
+                </button>
+              </div>
+            `;
+          } else {
+            resultContainer.innerHTML = `
+              <div style="font-size:3rem; margin-bottom:10px;">❌</div>
+              <div style="font-size:1.5rem; font-weight:700; color:var(--danger);">UNPAID</div>
+              <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${flatData.flatNo}${ownerName ? ' • ' + ownerName : ''}</div>
+              <div style="color:var(--text-muted); font-size:0.85rem; margin-top:6px;">Payment has not been recorded yet.</div>
+            `;
+          }
+        }
+
+        // 1. Instant check against pre-fetched flats array
+        let foundLocal = false;
+        if (Array.isArray(window.cachedFlatsData)) {
+          const cleanSearch = flatNo.replace(/^0+/, '');
+          const localFlat = window.cachedFlatsData.find(f => f.flatNo === flatNo || f.flatNo.replace(/^0+/, '') === cleanSearch);
+          if (localFlat) {
+            foundLocal = true;
+            renderResultCard({
+              flatNo: localFlat.flatNo,
+              floor: localFlat.floor,
+              ownerName: localFlat.ownerName || '',
+              isPaid: Boolean(localFlat.isPaid),
+              amount: localFlat.amountPaid || 0,
+              amountPaid: localFlat.amountPaid || 0,
+              paymentDate: localFlat.paymentDate,
+              receiptNo: localFlat.receiptNo,
+              receivedBy: localFlat.receivedBy || '',
+              bhandaraItems: localFlat.bhandaraItems || '',
+              paymentMode: localFlat.paymentMode || 'Cash'
+            });
+          }
+        }
+
+        // 2. Fetch fresh status from backend server
         try {
-          const response = await fetch('/api/quick-status', {
+          const response = await fetch(`/api/quick-status?flatNo=${encodeURIComponent(flatNo)}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (response.ok) {
+            const result = await response.json();
+            if (result && result.success) {
+              renderResultCard(result);
+              return;
+            }
+          }
+          // Fallback POST fetch
+          const postRes = await fetch('/api/quick-status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ flatNo })
           });
-          const result = await response.json();
-          if (result.success) {
-            resultContainer.style.display = 'block';
-            window.lastQuickResult = result;
-            if (result.isPaid) {
-              const formattedDate = safeFormatDate(result.paymentDate);
-              resultContainer.innerHTML = `
-                <div style="font-size:3rem; margin-bottom:10px;">✅</div>
-                <div style="font-size:1.5rem; font-weight:700; color:var(--success);">PAID</div>
-                <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${result.flatNo}${result.ownerName ? ' • ' + result.ownerName : ''}</div>
-                <div style="color:var(--text-secondary); margin-top:4px; font-size:0.95rem;">Amount Paid: <strong>₹${result.amount || 0}</strong> (${result.paymentMode === 'Online' ? '💳 Online / UPI' : '💵 Cash'})</div>
-                ${result.paymentDate ? `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Date: ${formattedDate}</div>` : ''}
-                <div style="margin-top:18px;">
-                  <button type="button" class="btn btn-primary" onclick="downloadQuickReceipt(window.lastQuickResult)" style="padding:10px 20px; font-size:0.95rem; border-radius:8px; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
-                    📄 Download Receipt (PDF)
-                  </button>
-                </div>
-              `;
-            } else {
-              resultContainer.innerHTML = `
-                <div style="font-size:3rem; margin-bottom:10px;">❌</div>
-                <div style="font-size:1.5rem; font-weight:700; color:var(--danger);">UNPAID</div>
-                <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${result.flatNo}${result.ownerName ? ' • ' + result.ownerName : ''}</div>
-                <div style="color:var(--text-muted); font-size:0.85rem; margin-top:6px;">Payment has not been recorded yet.</div>
-              `;
-            }
-          } else {
-            throw new Error(result.message);
+          const postResult = await postRes.json();
+          if (postResult && postResult.success) {
+            renderResultCard(postResult);
+          } else if (!foundLocal) {
+            throw new Error(postResult.message || 'Flat not found');
           }
         } catch (err) {
-          console.error('Quick check error:', err);
-          const errEl = document.getElementById('quickCheckError');
-          errEl.textContent = err.message || 'Failed to check status';
-          errEl.classList.add('show');
-          setTimeout(() => errEl.classList.remove('show'), 3000);
+          if (!foundLocal) {
+            console.error('Quick check error:', err);
+            if (errEl) {
+              errEl.textContent = err.message || 'Failed to check status';
+              errEl.classList.add('show');
+              setTimeout(() => errEl.classList.remove('show'), 3000);
+            }
+          }
         }
       });
 
