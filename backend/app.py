@@ -160,7 +160,7 @@ def init_db():
         ''')
         conn.commit()
 
-        # Insert default flats
+        # Insert default flats if empty
         cursor.execute('SELECT COUNT(*) FROM flats')
         count = cursor.fetchone()[0]
         if count == 0:
@@ -177,6 +177,25 @@ def init_db():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ''', flats_to_insert)
             conn.commit()
+
+        # Update flat owner names from PDF RESIDENTS list
+        try:
+            try:
+                from populate_residents import RESIDENTS
+            except ImportError:
+                from backend.populate_residents import RESIDENTS
+
+            for flat_no, owner_name in RESIDENTS.items():
+                floor = int(flat_no[0]) if len(flat_no) == 3 else 0
+                cursor.execute('''
+                    INSERT INTO flats (flat_no, floor, owner_name)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (flat_no) DO UPDATE SET owner_name = EXCLUDED.owner_name
+                    WHERE flats.owner_name IS NULL OR flats.owner_name = '' OR flats.owner_name != EXCLUDED.owner_name
+                ''', (flat_no, floor, owner_name))
+            conn.commit()
+        except Exception as res_err:
+            print("Warning: Could not sync RESIDENTS into flats table:", res_err)
 
         # Insert default admin user
         cursor.execute('SELECT * FROM users WHERE email = %s', ('admin@vargani.com',))
