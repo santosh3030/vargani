@@ -197,6 +197,22 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // DOM Element References
+      const tabQuickCheck = document.getElementById('tabQuickCheck');
+      const tabSignIn = document.getElementById('tabSignIn');
+      const tabSignUp = document.getElementById('tabSignUp');
+      const tabJourney = document.getElementById('tabJourney');
+      
+      const quickCheckForm = document.getElementById('quickCheckForm');
+      const signInForm = document.getElementById('signInForm');
+      const signUpForm = document.getElementById('signUpForm');
+      const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+      const journeySection = document.getElementById('journeySection');
+      
+      const quickFlatSelect = document.getElementById('quickFlatNo');
+      const signUpFlatSelect = document.getElementById('signUpFlat');
+      const forgotFlatSelect = document.getElementById('forgotFlat');
+
       // 1. Instant flat numbers populating (<1ms) so dropdown is never empty
       populateFlatDropdownsInstant();
 
