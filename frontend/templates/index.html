@@ -463,10 +463,15 @@
 
         if (!flatNo) return;
 
+        function checkIsPaid(val) {
+          if (val === true || val === 1 || val === '1' || val === 'true' || val === 'TRUE') return true;
+          return false;
+        }
+
         function renderResultCard(flatData) {
           resultContainer.style.display = 'block';
           window.lastQuickResult = flatData;
-          const isPaid = Boolean(flatData.isPaid);
+          const isPaid = checkIsPaid(flatData.isPaid);
           const ownerName = flatData.ownerName || '';
           const amount = flatData.amountPaid || flatData.amount || 0;
           const paymentMode = flatData.paymentMode || 'Cash';
@@ -500,14 +505,14 @@
         let foundLocal = false;
         if (Array.isArray(window.cachedFlatsData)) {
           const cleanSearch = flatNo.replace(/^0+/, '');
-          const localFlat = window.cachedFlatsData.find(f => f.flatNo === flatNo || f.flatNo.replace(/^0+/, '') === cleanSearch);
+          const localFlat = window.cachedFlatsData.find(f => String(f.flatNo) === String(flatNo) || String(f.flatNo).replace(/^0+/, '') === cleanSearch);
           if (localFlat) {
             foundLocal = true;
             renderResultCard({
               flatNo: localFlat.flatNo,
               floor: localFlat.floor,
               ownerName: localFlat.ownerName || '',
-              isPaid: Boolean(localFlat.isPaid),
+              isPaid: localFlat.isPaid,
               amount: localFlat.amountPaid || 0,
               amountPaid: localFlat.amountPaid || 0,
               paymentDate: localFlat.paymentDate,
