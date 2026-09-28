@@ -289,9 +289,15 @@ def api_quick_status():
     return jsonify({
         'success': True,
         'flatNo': flat['flat_no'],
-        'ownerName': flat['owner_name'],
+        'floor': flat['floor'],
+        'ownerName': flat['owner_name'] or '',
         'isPaid': bool(flat['is_paid']),
-        'amount': flat['amount_paid']
+        'amount': flat['amount_paid'] or 0.0,
+        'paymentDate': flat['payment_date'],
+        'receiptNo': flat['receipt_no'],
+        'receivedBy': flat['received_by'] or '',
+        'bhandaraItems': flat['bhandara_items'] or '',
+        'paymentMode': flat['payment_mode'] or 'Cash'
     })
 
 @app.route('/api/register', methods=['POST'])

@@ -6,6 +6,7 @@
   <meta name="description" content="Rambaugchi Matarani 2026 - Rambaugchi Matarani Vargani Building Society Management Portal. Login to manage flats, payments, and receipts.">
   <title>Rambaugchi Matarani 2026 | Rambaugchi Matarani Vargani</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/js/jspdf.umd.min.js"></script>
   <script>
     // Early non-blocking server wakeup ping
     (function() {
@@ -336,6 +337,101 @@
       tabSignUp.addEventListener('click', () => switchTab(tabSignUp, signUpForm));
       tabJourney.addEventListener('click', () => switchTab(tabJourney, journeySection));
 
+      // PDF Receipt Generator for Quick Check
+      window.downloadQuickReceipt = function(flat) {
+        if (!flat) return;
+        try {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+          const pageWidth = doc.internal.pageSize.getWidth();
+          const margin = 20;
+          let y = 20;
+
+          doc.setFillColor(128, 0, 0);
+          doc.rect(0, 0, pageWidth, 50, 'F');
+
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(22);
+          doc.setFont('helvetica', 'bold');
+          doc.text('RAMBAUGCHI MATARANI', pageWidth / 2, 22, { align: 'center' });
+
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Navratri Festival 2026', pageWidth / 2, 32, { align: 'center' });
+
+          doc.setFontSize(10);
+          doc.text('DONATION PAVATI', pageWidth / 2, 44, { align: 'center' });
+
+          y = 65;
+
+          doc.setTextColor(0, 0, 0);
+          doc.setDrawColor(128, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 12;
+
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Receipt No:', margin, y);
+          doc.setFont('helvetica', 'normal');
+          doc.text(flat.receiptNo || '—', margin + 35, y);
+
+          doc.setFont('helvetica', 'bold');
+          doc.text('Date:', pageWidth - margin - 60, y);
+          doc.setFont('helvetica', 'normal');
+          doc.text(formatDate(flat.paymentDate), pageWidth - margin - 40, y);
+
+          y += 20;
+
+          const details = [
+            ['Flat Number', flat.flatNo],
+            ['Floor', flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`],
+            ['Donor Name', flat.ownerName || '—'],
+            ['Donation Amount', `Rs. ${flat.amount || 0}`],
+            ['Payment Method', flat.paymentMode === 'Online' ? 'Online / UPI' : 'Cash'],
+            ['Payment Date', formatDate(flat.paymentDate)],
+            ['Payment Status', 'PAID'],
+            ['Received By', flat.receivedBy || 'Admin']
+          ];
+
+          if (flat.bhandaraItems && flat.bhandaraItems.trim() !== '') {
+            details.push(['Bhandara Items', flat.bhandaraItems]);
+          }
+
+          details.forEach(([label, value], index) => {
+            if (index % 2 === 0) {
+              doc.setFillColor(255, 245, 245);
+              doc.rect(margin, y - 5, pageWidth - (margin * 2), 14, 'F');
+            }
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(80, 80, 80);
+            doc.text(label, margin + 5, y + 3);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(String(value), pageWidth / 2, y + 3);
+
+            y += 14;
+          });
+
+          y += 10;
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 15;
+
+          doc.setFontSize(9);
+          doc.setTextColor(150, 150, 150);
+          doc.text('This is an automatically generated receipt.', pageWidth / 2, y, { align: 'center' });
+
+          doc.save(`Rambaugchi-Matarani-Receipt_${flat.flatNo}.pdf`);
+        } catch (err) {
+          console.error('Error generating PDF:', err);
+          alert('Failed to generate receipt PDF.');
+        }
+      };
+
       // Quick Check
       quickCheckForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -352,16 +448,26 @@
           const result = await response.json();
           if (result.success) {
             resultContainer.style.display = 'block';
+            window.lastQuickResult = result;
             if (result.isPaid) {
               resultContainer.innerHTML = `
                 <div style="font-size:3rem; margin-bottom:10px;">✅</div>
                 <div style="font-size:1.5rem; font-weight:700; color:var(--success);">PAID</div>
-                <div style="color:var(--text-secondary); margin-top:5px;">Amount: ₹${result.amount || 0}</div>
+                ${result.ownerName ? `<div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">${result.ownerName}</div>` : ''}
+                <div style="color:var(--text-secondary); margin-top:4px; font-size:0.95rem;">Amount Paid: <strong>₹${result.amount || 0}</strong> (${result.paymentMode === 'Online' ? '💳 Online / UPI' : '💵 Cash'})</div>
+                ${result.paymentDate ? `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Date: ${formatDate(result.paymentDate)}</div>` : ''}
+                <div style="margin-top:18px;">
+                  <button type="button" class="btn btn-primary" onclick="downloadQuickReceipt(window.lastQuickResult)" style="padding:10px 20px; font-size:0.95rem; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
+                    📄 Download Receipt (PDF)
+                  </button>
+                </div>
               `;
             } else {
               resultContainer.innerHTML = `
                 <div style="font-size:3rem; margin-bottom:10px;">❌</div>
                 <div style="font-size:1.5rem; font-weight:700; color:var(--danger);">UNPAID</div>
+                ${result.ownerName ? `<div style="color:var(--text-secondary); margin-top:8px;">Owner: ${result.ownerName}</div>` : ''}
+                <div style="color:var(--text-muted); font-size:0.85rem; margin-top:6px;">Payment has not been recorded yet.</div>
               `;
             }
           } else {
