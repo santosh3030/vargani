@@ -337,12 +337,29 @@
       tabSignUp.addEventListener('click', () => switchTab(tabSignUp, signUpForm));
       tabJourney.addEventListener('click', () => switchTab(tabJourney, journeySection));
 
+      // Safe Date Formatting helper
+      function safeFormatDate(dateStr) {
+        if (!dateStr) return '—';
+        try {
+          if (typeof formatDate === 'function') return formatDate(dateStr);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return dateStr;
+          return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch(e) {
+          return dateStr;
+        }
+      }
+
       // PDF Receipt Generator for Quick Check
       window.downloadQuickReceipt = function(flat) {
         if (!flat) return;
         try {
-          const { jsPDF } = window.jspdf;
-          const doc = new jsPDF();
+          const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+          if (!jsPDFClass) {
+            alert('Receipt PDF generator loading... Please try again in a moment.');
+            return;
+          }
+          const doc = new jsPDFClass();
           const pageWidth = doc.internal.pageSize.getWidth();
           const margin = 20;
           let y = 20;
@@ -370,6 +387,8 @@
           doc.line(margin, y, pageWidth - margin, y);
           y += 12;
 
+          const pDate = safeFormatDate(flat.paymentDate);
+
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.text('Receipt No:', margin, y);
@@ -379,7 +398,7 @@
           doc.setFont('helvetica', 'bold');
           doc.text('Date:', pageWidth - margin - 60, y);
           doc.setFont('helvetica', 'normal');
-          doc.text(formatDate(flat.paymentDate), pageWidth - margin - 40, y);
+          doc.text(pDate, pageWidth - margin - 40, y);
 
           y += 20;
 
@@ -389,7 +408,7 @@
             ['Donor Name', flat.ownerName || '—'],
             ['Donation Amount', `Rs. ${flat.amount || 0}`],
             ['Payment Method', flat.paymentMode === 'Online' ? 'Online / UPI' : 'Cash'],
-            ['Payment Date', formatDate(flat.paymentDate)],
+            ['Payment Date', pDate],
             ['Payment Status', 'PAID'],
             ['Received By', flat.receivedBy || 'Admin']
           ];
@@ -439,6 +458,8 @@
         const resultContainer = document.getElementById('quickCheckResult');
         resultContainer.style.display = 'none';
 
+        if (!flatNo) return;
+
         try {
           const response = await fetch('/api/quick-status', {
             method: 'POST',
@@ -450,14 +471,15 @@
             resultContainer.style.display = 'block';
             window.lastQuickResult = result;
             if (result.isPaid) {
+              const formattedDate = safeFormatDate(result.paymentDate);
               resultContainer.innerHTML = `
                 <div style="font-size:3rem; margin-bottom:10px;">✅</div>
                 <div style="font-size:1.5rem; font-weight:700; color:var(--success);">PAID</div>
-                ${result.ownerName ? `<div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">${result.ownerName}</div>` : ''}
+                <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${result.flatNo}${result.ownerName ? ' • ' + result.ownerName : ''}</div>
                 <div style="color:var(--text-secondary); margin-top:4px; font-size:0.95rem;">Amount Paid: <strong>₹${result.amount || 0}</strong> (${result.paymentMode === 'Online' ? '💳 Online / UPI' : '💵 Cash'})</div>
-                ${result.paymentDate ? `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Date: ${formatDate(result.paymentDate)}</div>` : ''}
+                ${result.paymentDate ? `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Date: ${formattedDate}</div>` : ''}
                 <div style="margin-top:18px;">
-                  <button type="button" class="btn btn-primary" onclick="downloadQuickReceipt(window.lastQuickResult)" style="padding:10px 20px; font-size:0.95rem; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
+                  <button type="button" class="btn btn-primary" onclick="downloadQuickReceipt(window.lastQuickResult)" style="padding:10px 20px; font-size:0.95rem; border-radius:8px; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
                     📄 Download Receipt (PDF)
                   </button>
                 </div>
@@ -466,7 +488,7 @@
               resultContainer.innerHTML = `
                 <div style="font-size:3rem; margin-bottom:10px;">❌</div>
                 <div style="font-size:1.5rem; font-weight:700; color:var(--danger);">UNPAID</div>
-                ${result.ownerName ? `<div style="color:var(--text-secondary); margin-top:8px;">Owner: ${result.ownerName}</div>` : ''}
+                <div style="color:var(--text-primary); font-weight:600; margin-top:8px; font-size:1.1rem;">Flat ${result.flatNo}${result.ownerName ? ' • ' + result.ownerName : ''}</div>
                 <div style="color:var(--text-muted); font-size:0.85rem; margin-top:6px;">Payment has not been recorded yet.</div>
               `;
             }
@@ -474,6 +496,7 @@
             throw new Error(result.message);
           }
         } catch (err) {
+          console.error('Quick check error:', err);
           const errEl = document.getElementById('quickCheckError');
           errEl.textContent = err.message || 'Failed to check status';
           errEl.classList.add('show');

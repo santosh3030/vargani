@@ -280,11 +280,16 @@ def api_quick_status():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
     flat = cursor.fetchone()
+    if not flat:
+        clean_no = flat_no.lstrip('0')
+        cursor.execute("SELECT * FROM flats WHERE LTRIM(flat_no, '0') = %s OR flat_no ILIKE %s", (clean_no if clean_no else '0', flat_no))
+        flat = cursor.fetchone()
+
     cursor.close()
     conn.close()
     
     if not flat:
-        return jsonify({'success': False, 'message': 'Invalid flat number'}), 404
+        return jsonify({'success': False, 'message': f'Flat {flat_no} not found'}), 404
         
     return jsonify({
         'success': True,
