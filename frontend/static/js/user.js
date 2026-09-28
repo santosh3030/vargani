@@ -81,6 +81,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="value">${formatCurrency(flat.amountPaid)}</span>
             </div>
             <div class="flat-info-item">
+              <span class="label">Payment Method</span>
+              <span class="value" style="font-weight:600;">${flat.paymentMode === 'Online' ? '💳 Online / UPI' : '💵 Cash'}</span>
+            </div>
+            <div class="flat-info-item">
               <span class="label">Payment Date</span>
               <span class="value">${formatDate(flat.paymentDate)}</span>
             </div>
@@ -443,6 +447,7 @@ async function downloadReceipt() {
       ['Floor', flat.floor === 0 ? 'Ground Floor' : `Floor ${flat.floor}`],
       ['Donor Name', flat.ownerName || '—'],
       ['Donation Amount', formatCurrency(flat.amountPaid).replace('₹', 'Rs. ')],
+      ['Payment Method', flat.paymentMode === 'Online' ? 'Online / UPI' : 'Cash'],
       ['Payment Date', formatDate(flat.paymentDate)],
       ['Payment Status', 'PAID'],
       ['Received By', flat.receivedBy || 'Admin']

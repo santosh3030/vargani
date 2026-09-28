@@ -97,7 +97,8 @@ def init_db():
                 payment_date TEXT,
                 receipt_no TEXT,
                 received_by TEXT,
-                bhandara_items TEXT
+                bhandara_items TEXT,
+                payment_mode TEXT DEFAULT 'Cash'
             )
         ''')
         conn.commit()
@@ -105,7 +106,8 @@ def init_db():
         # Safely add columns if they don't exist (for older databases)
         columns_to_add = [
             ("received_by", "TEXT"),
-            ("bhandara_items", "TEXT")
+            ("bhandara_items", "TEXT"),
+            ("payment_mode", "TEXT DEFAULT 'Cash'")
         ]
         
         for col_name, col_type in columns_to_add:
@@ -632,7 +634,8 @@ def get_flats():
             'paymentDate': f['payment_date'],
             'receiptNo': f['receipt_no'],
             'receivedBy': f['received_by'] or '',
-            'bhandaraItems': f['bhandara_items'] or ''
+            'bhandaraItems': f['bhandara_items'] or '',
+            'paymentMode': f['payment_mode'] or 'Cash'
         })
     return jsonify(result)
 
@@ -657,7 +660,8 @@ def get_flat(flat_no):
         'paymentDate': f['payment_date'],
         'receiptNo': f['receipt_no'],
         'receivedBy': f['received_by'] or '',
-        'bhandaraItems': f['bhandara_items'] or ''
+        'bhandaraItems': f['bhandara_items'] or '',
+        'paymentMode': f['payment_mode'] or 'Cash'
     })
 
 @app.route('/api/flats/<flat_no>', methods=['POST'])
@@ -671,6 +675,7 @@ def update_flat_api(flat_no):
     amount_paid = float(data.get('amountPaid', 0.0)) if is_paid else 0.0
     payment_date = data.get('paymentDate') if is_paid else None
     received_by = data.get('receivedBy', '').strip() if is_paid else None
+    payment_mode = data.get('paymentMode', 'Cash').strip() if is_paid else 'Cash'
     bhandara_items = data.get('bhandaraItems', '').strip()
     
     conn = get_db_connection()
@@ -690,9 +695,9 @@ def update_flat_api(flat_no):
 
     cursor.execute('''
         UPDATE flats 
-        SET owner_name = %s, is_paid = %s, amount_paid = %s, payment_date = %s, receipt_no = %s, received_by = %s, bhandara_items = %s
+        SET owner_name = %s, is_paid = %s, amount_paid = %s, payment_date = %s, receipt_no = %s, received_by = %s, bhandara_items = %s, payment_mode = %s
         WHERE flat_no = %s
-    ''', (owner_name, int(is_paid), amount_paid, payment_date, receipt_no, received_by, bhandara_items, flat_no))
+    ''', (owner_name, int(is_paid), amount_paid, payment_date, receipt_no, received_by, bhandara_items, payment_mode, flat_no))
     conn.commit()
     
     cursor.execute('SELECT * FROM flats WHERE flat_no = %s', (flat_no,))
@@ -708,7 +713,9 @@ def update_flat_api(flat_no):
         'amountPaid': updated['amount_paid'] or 0.0,
         'paymentDate': updated['payment_date'],
         'receiptNo': updated['receipt_no'],
-        'receivedBy': updated['received_by'] or ''
+        'receivedBy': updated['received_by'] or '',
+        'bhandaraItems': updated['bhandara_items'] or '',
+        'paymentMode': updated['payment_mode'] or 'Cash'
     })
 
 @app.route('/api/stats', methods=['GET'])
@@ -724,11 +731,27 @@ def get_stats():
         cursor.execute('SELECT SUM(amount_paid) FROM flats')
         amount = cursor.fetchone()[0] or 0.0
         
+        # Cash breakdown
+        cursor.execute("SELECT COUNT(*), COALESCE(SUM(amount_paid), 0.0) FROM flats WHERE is_paid = 1 AND (payment_mode IS NULL OR payment_mode = '' OR payment_mode = 'Cash')")
+        cash_row = cursor.fetchone()
+        cash_count = cash_row[0]
+        cash_amount = float(cash_row[1])
+
+        # Online breakdown
+        cursor.execute("SELECT COUNT(*), COALESCE(SUM(amount_paid), 0.0) FROM flats WHERE is_paid = 1 AND payment_mode = 'Online'")
+        online_row = cursor.fetchone()
+        online_count = online_row[0]
+        online_amount = float(online_row[1])
+
         return jsonify({
             'total': total,
             'paid': paid,
             'unpaid': unpaid,
-            'totalAmount': amount
+            'totalAmount': amount,
+            'cashCount': cash_count,
+            'cashAmount': cash_amount,
+            'onlineCount': online_count,
+            'onlineAmount': online_amount
         })
     finally:
         cursor.close()

@@ -117,7 +117,7 @@ function renderBuildingOverview(container, flats) {
       flatDiv.classList.add('paid');
       detailsHtml = `
         <div style="font-size: 0.8rem; margin-top: 8px;">
-          <div>Paid: ${formatCurrency(f.amountPaid)}</div>
+          <div>Paid: ${formatCurrency(f.amountPaid)} (${f.paymentMode === 'Online' ? '💳 Online' : '💵 Cash'})</div>
           <div>Date: ${formatDate(f.paymentDate)}</div>
         </div>
       `;

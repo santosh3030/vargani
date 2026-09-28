@@ -73,6 +73,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ---- Render Stats ----
   function renderStatsWithData(stats) {
     if (!statsGrid || !stats) return;
+    const cashAmt = stats.cashAmount || 0;
+    const cashCnt = stats.cashCount || 0;
+    const onlineAmt = stats.onlineAmount || 0;
+    const onlineCnt = stats.onlineCount || 0;
+
     statsGrid.innerHTML = `
       <div class="stat-card total">
         <div class="stat-icon">🏢</div>
@@ -82,17 +87,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="stat-card paid">
         <div class="stat-icon">✅</div>
         <div class="stat-value">${stats.paid}</div>
-        <div class="stat-label">Paid</div>
-      </div>
-      <div class="stat-card unpaid">
-        <div class="stat-icon">⏳</div>
-        <div class="stat-value">${stats.unpaid}</div>
-        <div class="stat-label">Unpaid</div>
+        <div class="stat-label">Paid (${stats.unpaid} Unpaid)</div>
       </div>
       <div class="stat-card amount">
         <div class="stat-icon">💰</div>
         <div class="stat-value">${formatCurrency(stats.totalAmount)}</div>
         <div class="stat-label">Total Collected</div>
+      </div>
+      <div class="stat-card cash" style="border-left: 4px solid #10b981; background: var(--bg-secondary);">
+        <div class="stat-icon">💵</div>
+        <div class="stat-value" style="color: #10b981;">${formatCurrency(cashAmt)}</div>
+        <div class="stat-label">Cash (${cashCnt} flats)</div>
+      </div>
+      <div class="stat-card online" style="border-left: 4px solid #3b82f6; background: var(--bg-secondary);">
+        <div class="stat-icon">💳</div>
+        <div class="stat-value" style="color: #3b82f6;">${formatCurrency(onlineAmt)}</div>
+        <div class="stat-label">Online / UPI (${onlineCnt} flats)</div>
       </div>
     `;
   }
@@ -149,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="flat-card ${flat.isPaid ? 'paid' : 'unpaid'}" data-flat="${flat.flatNo}" title="Click to edit">
                 <div class="flat-number">${flat.flatNo}</div>
                 <div class="flat-owner">${flat.ownerName || '—'}</div>
-                <div class="flat-status">${flat.isPaid ? '● Paid' : '○ Unpaid'}</div>
+                <div class="flat-status">${flat.isPaid ? `● Paid (${flat.paymentMode === 'Online' ? '💳 Online' : '💵 Cash'})` : '○ Unpaid'}</div>
                 ${flat.bhandaraItems ? `<div style="font-size:0.75rem; color:var(--accent-primary); margin-top:4px;">🌾 ${flat.bhandaraItems}</div>` : ''}
               </div>
             `).join('')}
@@ -204,6 +214,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('editPaymentDate').value = flat.paymentDate || '';
       document.getElementById('editReceivedBy').value = flat.receivedBy || '';
       document.getElementById('editBhandara').value = flat.bhandaraItems || '';
+      const modeSelect = document.getElementById('editPaymentMode');
+      if (modeSelect) modeSelect.value = flat.paymentMode || 'Cash';
 
       const paidBtn = document.getElementById('statusPaid');
       const unpaidBtn = document.getElementById('statusUnpaid');
@@ -247,6 +259,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const amountPaid = parseFloat(document.getElementById('editAmount').value) || 0;
     const paymentDate = document.getElementById('editPaymentDate').value || null;
     const receivedBy = document.getElementById('editReceivedBy').value.trim() || null;
+    const modeSelect = document.getElementById('editPaymentMode');
+    const paymentMode = modeSelect ? modeSelect.value : 'Cash';
     const bhandaraItems = document.getElementById('editBhandara').value.trim();
 
     const updates = {
@@ -255,6 +269,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       amountPaid: isPaid ? amountPaid : 0,
       paymentDate: isPaid ? paymentDate : null,
       receivedBy: isPaid ? receivedBy : null,
+      paymentMode: isPaid ? paymentMode : 'Cash',
       bhandaraItems
     };
 

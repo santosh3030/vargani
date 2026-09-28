@@ -199,6 +199,13 @@
             <input type="number" id="editAmount" placeholder="Enter amount paid" min="0">
           </div>
           <div class="form-group">
+            <label for="editPaymentMode">Payment Method</label>
+            <select id="editPaymentMode" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-primary); font-size:1rem; margin-top:5px;">
+              <option value="Cash">💵 Cash</option>
+              <option value="Online">💳 Online / UPI</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label for="editPaymentDate">Payment Date</label>
             <input type="date" id="editPaymentDate">
           </div>
